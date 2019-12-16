@@ -1,0 +1,306 @@
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$#,##0.00;($#,##0.00)';
+SET TimeFormat='h:mm:ss TT';
+SET DateFormat='YYYY-MM-DD';
+SET TimestampFormat='YYYY-MM-DD h:mm:ss[.fff] TT';
+SET FirstWeekDay=6;
+SET BrokenWeeks=1;
+SET ReferenceDay=0;
+SET FirstMonthOfYear=1;
+SET CollationLocale='en-US';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET LongMonthNames='January;February;March;April;May;June;July;August;September;October;November;December';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+SET LongDayNames='Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
+
+
+//insert this line to call this script:
+//*************************************************************************************************
+//     $(Must_Include='lib://Qlik Network Folders\Application Scripts\Extract\DataWarehouse.qxt');
+//*************************************************************************************************
+
+//--------ADD DATA CONNECTION HERE---------------
+LIB CONNECT TO 'DW_DB';
+
+// Setting to reload data in full or just partial
+
+//LET vReloadType = 0;  // uncomment this to force a specific reload type 
+// || 0 = Partial || 1 = History ||
+Let vMode = If(Match(Weekday(today()),'Sun'),1,0);
+Let vReloadType = $(vMode);
+//adding a comment===
+
+
+let Filepath = 'Qlik Network Folders\1_Source_QVD';
+let SourceFolder = 'DW';
+let HistoryYears= 3;
+
+
+//-----------------------------------------------------------------------------------------
+//***************************************GET HISTORY***************************************
+//######################## ADD CALLS FOR EACH TABLE IN THIS SECTION########################
+    SUB getHistory
+
+        //******************************************************************************
+        // 	Name:			getHistory
+        // 	Description: 	Gets all data from Start of the prior year and current year 
+        //					and saves a year-month qvd
+        //  Variable Info:  EndDate - should be the end of the current month
+        //                  MinDate - Historical  reload Start Date
+        //                  MaxDate - End of Month of MinDate
+        //                  YearMonth - used for naming QVDs
+        //******************************************************************************
+
+
+
+        LET vEndDate = Date(MonthEnd(Today()) + 1,'YYYY-MM-DD');
+        LET vMinDate = Date(AddYears(YearStart(vEndDate),-$(HistoryYears)),'YYYY-MM-DD');
+
+        LET vMaxDate 	= Date(MonthEnd(vMinDate) + 1,'YYYY-MM-DD');
+        LET vYearMonth 	= Year(vMinDate)&Num(Month(vMinDate),'00');
+
+        DO WHILE vEndDate >= vMaxDate
+            TRACE ;
+            TRACE Date >= $(vMinDate) AND Date < $(vMaxDate) Period $(vYearMonth);
+
+            // Getting data ranges by create date
+            //Set a Call Statement for each Table to be Extracted
+            //***************************************************
+            // TableName (pOwner,pTableName,pDateField)
+            //      pOwner = table owner/schema
+            //      pTableName = name of table within the schema
+            //      pDateField = key date that should be used in extraction
+            //      "pOwner"."pTableName" is inserted in the sql statement
+            //
+            // Each table needs to be extracted by YearMonth of a 
+            // key date field and stored out to a comon location
+            // for later concatenation
+            //***************************************************
+
+            //Call TableName ('pOwner','pTableName','pDateField')
+            // example       'reportdb','bnfi_invoice','create_date' 
+
+            Call LOAD_PLANNING_SHIPMENTS ('OWNING_USER_OR_SCHEMA','TABLE_NAME','KEY_DATE')   
+        
+            //Setting variables for next step
+            LET vMinDate 	= vMaxDate;
+            LET vMaxDate 	= Date(MonthEnd(vMinDate) + 1,'YYYY-MM-DD');
+            LET vYearMonth 	= Year(vMinDate)&Num(Month(vMinDate),'00'); // For qvd name
+        LOOP;
+
+    END SUB;
+//-----------------------------------------------------------------------------------------
+
+
+//-----------------------------------------------------------------------------------------
+//***********************************GET UPDATED*******************************************
+//######################## ADD CALLS FOR EACH TABLE IN THIS SECTION########################
+    SUB getUpdated
+
+        //******************************************************************************
+        // 	Name:			getUpdated
+        // 	Description: 	Gets only updated records based on the update date field and 
+        //					saves into the appropriate year-month qvd based on create date
+        //******************************************************************************
+
+        LET vMinDate = Date(Today()-5,'YYYY-MM-DD'); //Always gets 5 days before, just in case one day it did not run
+        LET vMaxDate = Date(Today()+1,'YYYY-MM-DD');
+
+        //*************************************************************************
+        // Call SubName('Owner','Tablename','KeyModifyDate');
+        // Call UpdateQvds('TableName','KeyDate','PrimaryKey')
+        //*************************************************************************
+
+        /*//TableName
+        Call SubName('Owner','Tablename','KeyModifyDate');
+        Call UpdateQvds('TableName','KeyDate','PrimaryKey') */
+
+        //LOAD_PLANNING_SHIPMENTS
+        Call LOAD_PLANNING_SHIPMENTS('OWNING_USER_OR_SCHEMA','TABLE_NAME','KEY_UPDATE_DATE');
+        Call UpdateQvds('TABLE_NAME','KEY_DATE','PRIMARY_KEY');        
+
+    END SUB;
+//-----------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------------------
+//*****************************************************************************************
+//***************************************TABLENAME*****************************************
+//**************************This section is a repeating section for************************
+//**************************each database table that needs extraction**********************
+
+
+    //SAMPLE HERE----------
+        /* //*********************************TABLENAME1*********************************
+        //**************************SAMPLE****SAMPLE****SAMPLE***************************
+        SUB TableName(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "Field_1", 
+                "Field_2", 
+                "Field_3"
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB; */
+    //---------------------
+
+    //***************************LOAD_PLANNING_SHIPMENTS*****************************
+        SUB TABLE_NAME(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "PRIMARY_KEY",
+                "KEY_DATE",
+                "KEY_UPDATE_DATE",
+                "FIELD_1",
+                "FIELD_2",
+                "FIELD_3",
+                "FIELD_4"
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+//*****************************************************************************************
+//-----------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------------------
+//**************************************CREATE QVD*****************************************
+    SUB CreateQvd(pTableName)
+
+
+        LET vMaxYear = Year(Today()); 	                // Current year
+        IF '$(pTableName)'='NN_INVOICE_TRACKING' THEN
+            LET vMinYear = (vMaxYear-$(HistoryYears))+2;
+        ELSE 		// Should not exceed max historical extract ever performed
+            LET vMinYear = vMaxYear-$(HistoryYears);
+        END IF;
+
+        DO WHILE vMinYear <= vMaxYear
+            Trace $(vMinYear);
+            
+            [$(pTableName)]:
+            LOAD *
+            FROM 
+                [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vMinYear)*.qvd](qvd);
+
+            LET vMinYear = vMinYear +1;        
+        LOOP;
+
+        STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\$(pTableName).qvd';
+
+        DROP TABLE [$(pTableName)];
+
+    END SUB;
+//-----------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------------------
+//**************************************UPDATE QVD*****************************************
+    SUB UpdateQvds(pTableName,pCreateDateField,pPrimaryKey)
+
+        LET vMinYear = vMaxYear-$(HistoryYears);		// Should not exceed max historical extract ever performed
+
+        //Creating a list for all monthly qvd files to be updated
+        QvdList:
+        Load
+            DISTINCT
+            Year($(pCreateDateField)) &	Num(Month($(pCreateDateField)),00)	AS YearMonth
+        Resident
+            $(pTableName)
+        Where     
+            Year($(pCreateDateField)) >= $(vMinYear);
+
+        For i = 0 to NoOfRows('QvdList')-1
+            LET vYearMonth = Peek('YearMonth',i,'QvdList');
+
+            TRACE ;
+            TRACE Updating monthly Qvd $(vYearMonth);
+
+            NoConcatenate
+            Updated:
+            Load
+                *
+            Resident
+                $(pTableName)
+            Where
+                Year($(pCreateDateField)) &	Num(Month($(pCreateDateField)),00) = $(vYearMonth);
+
+            IF not IsNull(QvdTableName('[lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd]')) THEN
+            
+                CONCATENATE(Updated)
+                Stored:
+                LOAD
+                    *
+                From
+                    [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth)*.qvd](qvd)
+                Where 
+                    Not Exists($(pPrimaryKey),$(pPrimaryKey));
+            ENDIF
+
+            STORE Updated INTO [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd];    
+            DROP TABLE Updated;
+
+        Next
+
+        DROP TABLE QvdList;
+        DROP TABLE $(pTableName);
+
+    END SUB;
+//-----------------------------------------------------------------------------------------
+
+
+
+//-----------------------------------------------------------------------------------------
+//*************************************CALL STATEMENTS*************************************
+
+    IF vReloadType = 1 THEN
+        CALL getHistory;
+    ELSE
+        CALL getUpdated;
+    ENDIF
+
+
+    //-----------------------------------------------------------------
+    //Create one Qvd for table only with x years back and current year
+    //*****************************************************************
+    // CALL CreateQvd('TableName');
+    // Need one for EACH table that is being extracted in the app
+    //*****************************************************************
+        // CALL CreateQvd('TableName')
+        CALL CreateQvd('LOAD_PLANNING_SHIPMENTS');
+        //repeats go here//
+    //*****************************************************************
+//-----------------------------------------------------------------------------------------
+
