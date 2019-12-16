@@ -299,7 +299,7 @@ let HistoryYears= 3;
     // Need one for EACH table that is being extracted in the app
     //*****************************************************************
         // CALL CreateQvd('TableName')
-        CALL CreateQvd('LOAD_PLANNING_SHIPMENTS');
+        CALL CreateQvd('TABLE_NAME');
         //repeats go here//
     //*****************************************************************
 //-----------------------------------------------------------------------------------------
