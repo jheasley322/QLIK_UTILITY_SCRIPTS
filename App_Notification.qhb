@@ -50,7 +50,7 @@ ELSE                                                                            
 
 Let pLib = 'JSON POST';                                                                         // set the LIB connection name
                                                                                                 // below is the webhook address from teams
-Let v.Load.Webhook.Address = 'https://outlook.office.com/webhook/ae69edd6-da92-4772-8587-e3d2cfa611a7@a0939492-debd-4ad8-b4f0-475854182417/IncomingWebhook/925cf4c7c4f94e92b28d40ca43be7010/69daebb8-37aa-4184-aaa6-07ba1bf4204e';
+Let WebhookAddress = 'https://outlook.office.com/webhook/ae69edd6-da92-4772-8587-e3d2cfa611a7@a0939492-debd-4ad8-b4f0-475854182417/IncomingWebhook/925cf4c7c4f94e92b28d40ca43be7010/69daebb8-37aa-4184-aaa6-07ba1bf4204e';
 Let server = ComputerName();                                                                    // sets the server name as a variable
 
 
@@ -181,14 +181,15 @@ Sub CurrentTasks
 
     DROP TABLE RestConnectorMasterTable;
 End Sub;
-    Call CurrentTasks;
+    
+Call CurrentTasks;
 
 
 Sub Fails
     // this sub does a resident load from the TaskList table, only when the status is 8(failed)
-    SET v.Load.Table.Name = 'Tasks';
-    TRACE ========== Loading $(v.Load.Table.Name) ==========;
-    $(v.Load.Table.Name):
+    SET TableName = 'Tasks';
+    TRACE ========== Loading $(TableName) ==========;
+    $(TableName):
     NoConcatenate
     LOAD * Resident TaskList
         where match(status,8,10,11,12);
@@ -206,26 +207,27 @@ Sub Fails
     Drop Table TaskList;
     // drops the original TaskList and keeps only the failed tasks
 End Sub;
-    Call Fails;
+
+Call Fails;
     
 
 SUB Notification
     //this sub composes the notification cards that are sent to teams
     LET vFailCount   = NOOFROWS('Tasks');                                                       // sets the number of failures detected
-    LET v.Load.Send.Card.Main.Title = 'Failed Task Alert';                                      // sets the main title of the card
+    LET CardTitle = 'Failed Task Alert';                                      // sets the main title of the card
 
     Trace Fail Count is $(vFailCount);                                                          // writes out the fail count in the log
         
     IF  $(vFailCount) > 0 THEN                                                                  // if there are more than 0 failures, set the main card details as this
-        LET v.Load.Send.Card.Message        = 'There are ' & $(vFailCount) &' tasks currently in a failed status ('& NOW()&')'&
+        LET CardMessage        = 'There are ' & $(vFailCount) &' tasks currently in a failed status ('& NOW()&')'&
                                               '<br>'&' List of Failed Tasks: <br>'& '$(vAllFails)'; // card message
-        LET v.Load.Send.Card.Theme.Colour   = '$(iColor)';                                                                      // card color
-        LET v.Load.Send.Card.Title          = 'Task Failure Alert';                                                             // sub title
+        LET CardColor   = '$(iColor)';                                                                      // card color
+        LET CardSubTitle          = 'Task Failure Alert';                                                             // sub title
     //-------------------------------------------------------------------------this block is not currently in use----------------------------------                                                    
     ELSE                                                                                        // if there are less than 1 failures, set the main card details as this
-        LET v.Load.Send.Card.Message        = 'There are currently no task failures';                                           // card message
-        LET v.Load.Send.Card.Theme.Colour   = '$(iColor)';                                                                      // card color
-        LET v.Load.Send.Card.Title          = 'No Failures';                                                                    // sub title
+        LET CardMessage        = 'There are currently no task failures';                                           // card message
+        LET CardColor   = '$(iColor)';                                                                      // card color
+        LET CardSubTitle          = 'No Failures';                                                                    // sub title
     //----------------------------------------------------------------------------------------------------------------------------------------------    
     END IF;
     
@@ -236,24 +238,24 @@ SUB Notification
     //===================================================================================================================================================================
     //----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>       do not change anything that is CONFIG
     
-    LET v.Load.REST.Post.PayLoad2='{';                                                                                          //****************part of CONFIG
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'"@type": "MessageCard",';                                    //****************type of alert (CONFIG)
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'"@context": "http://schema.org/extensions",';                    //****************schema to use (CONFIG)
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'"summary": "Qlik Alert",';                                       //alert summary
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'"title": "'& '$(v.Load.Send.Card.Main.Title)' &'",';             //main title
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'"text": "Alert Message from $(server)",';                        //server identification
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'"themeColor": "'& '$(v.Load.Send.Card.Theme.Colour)' &'",';      //color
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'"sections": [';                                                  //****************part of CONFIG
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'{';                                                              //****************part of CONFIG
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'"title": "'& '$(v.Load.Send.Card.Title)' &'",';                  //sub title
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'"text": "'&'<blockquote>'& '$(v.Load.Send.Card.Message)' &'</blockquote>'&'",';                 //card message
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'}';                                                              //****************part of CONFIG
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &']';                                                              //****************part of CONFIG
-    LET v.Load.REST.Post.PayLoad2= v.Load.REST.Post.PayLoad2 &'}';                                                              //****************part of CONFIG
+    LET Payload2='{';                                                                                          //****************part of CONFIG
+    LET Payload2= Payload2 &'"@type": "MessageCard",';                                    //****************type of alert (CONFIG)
+    LET Payload2= Payload2 &'"@context": "http://schema.org/extensions",';                    //****************schema to use (CONFIG)
+    LET Payload2= Payload2 &'"summary": "Qlik Alert",';                                       //alert summary
+    LET Payload2= Payload2 &'"title": "'& '$(CardTitle)' &'",';             //main title
+    LET Payload2= Payload2 &'"text": "Alert Message from $(server)",';                        //server identification
+    LET Payload2= Payload2 &'"themeColor": "'& '$(CardColor)' &'",';      //color
+    LET Payload2= Payload2 &'"sections": [';                                                  //****************part of CONFIG
+    LET Payload2= Payload2 &'{';                                                              //****************part of CONFIG
+    LET Payload2= Payload2 &'"title": "'& '$(CardSubTitle)' &'",';                  //sub title
+    LET Payload2= Payload2 &'"text": "'&'<blockquote>'& '$(CardMessage)' &'</blockquote>'&'",';                 //card message
+    LET Payload2= Payload2 &'}';                                                              //****************part of CONFIG
+    LET Payload2= Payload2 &']';                                                              //****************part of CONFIG
+    LET Payload2= Payload2 &'}';                                                              //****************part of CONFIG
 
 
     //====================================================================================================================================================================
-    LET v.Load.REST.Post.PayLoad2 = REPLACE(v.Load.REST.Post.PayLoad2,'"', CHR(34)&CHR(34));    //text replace to finalize formatting
+    LET Payload2 = REPLACE(Payload2,'"', CHR(34)&CHR(34));    //text replace to finalize formatting
 
     LIB CONNECT TO '$(pLib)';                                                                   //connect to the library connection
     
@@ -265,14 +267,15 @@ SUB Notification
         "__KEY__response_header"
     FROM JSON "_response_header" PK "__KEY__response_header"
         WITH CONNECTION (                                                                       // this sends the payload back through the REST connection
-            URL "$(v.Load.Webhook.Address)",  
+            URL "$(WebhookAddress)",  
             HTTPHEADER "Content-Type" "application/json",
-            BODY "$(v.Load.REST.Post.PayLoad2)" ) 
+            BODY "$(Payload2)" ) 
     ;
     Drop Table Tasks;                                                                           // get rid of task table
     END IF;                                                                                     // finishes payload composition, no ELSE to handle when there are 0 failures
         
 END SUB;
-    CALL Notification;
+
+CALL Notification;
 
 END IF;                                                                                         // finishes actions required when NOW is during runtime.
