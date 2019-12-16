@@ -31,8 +31,8 @@ SET NumericalAbbreviation='3:k;6:M;9:G;12:T;15:P;18:E;21:Z;24:Y;-3:m;-6:μ;-9:n;
 
 Let iNow = hour(Now());
 
-Let iDayStart =     6;                                                                          // set the minimum hour to send notices -1
-Let iDayEnd =       21;                                                                         // set the maxmimum hour to send notices +1
+Let iDayStart =     6;                                                                          // set the minimum hour to send notices -1 (6 = start notifications at 7am)
+Let iDayEnd =       21;                                                                         // set the maxmimum hour to send notices +1 (21 = stop notifications at 8pm)
 let iDaytime =      if($(iNow)>$(iDayStart) AND $(iNow)<$(iDayEnd),1,0);                        // flags whether or not the time is "daytime" based on your start/stop hours
 Let iWeekday =      if(Match(WeekDay(today(),),'Sat','Sun'),0,1);                               // flags whether or not the day is a weekday or weekend based on the execution time of the app
 Let iRuntime =      If($(iWeekday)=1 AND $(iDaytime)=1,'yes','no');                             // flags whether or not notifications should be sent based on IS DAYTIME AND IS WEEKDAY
@@ -46,6 +46,7 @@ Let iColor = if('$(iEnvironment)'='PROD','F93F17','F8981D');                    
 
 IF '$(iRuntime)' = 'no' THEN
     Exit Script;                                                                                // bail out of script if NOW is not during RUNTIME
+
 ELSE                                                                                            // if NOW is during RUNTIME, do the rest of the script after this point
 
 Let pLib = 'JSON POST';                                                                         // set the LIB connection name
@@ -214,20 +215,21 @@ Call Fails;
 SUB Notification
     //this sub composes the notification cards that are sent to teams
     LET vFailCount   = NOOFROWS('Tasks');                                                       // sets the number of failures detected
-    LET CardTitle = 'Failed Task Alert';                                      // sets the main title of the card
+    LET CardTitle = 'Failed Task Alert';                                                        // sets the main title of the card
 
     Trace Fail Count is $(vFailCount);                                                          // writes out the fail count in the log
         
     IF  $(vFailCount) > 0 THEN                                                                  // if there are more than 0 failures, set the main card details as this
-        LET CardMessage        = 'There are ' & $(vFailCount) &' tasks currently in a failed status ('& NOW()&')'&
-                                              '<br>'&' List of Failed Tasks: <br>'& '$(vAllFails)'; // card message
-        LET CardColor   = '$(iColor)';                                                                      // card color
-        LET CardSubTitle          = 'Task Failure Alert';                                                             // sub title
+        LET CardMessage = 'There are ' & $(vFailCount) 
+            &' tasks currently in a failed status ('& NOW()&')'&
+            '<br>'&' List of Failed Tasks: <br>'& '$(vAllFails)';                               // card message
+        LET CardColor = '$(iColor)';                                                            // card color
+        LET CardSubTitle          = 'Task Failure Alert';                                       // sub title
     //-------------------------------------------------------------------------this block is not currently in use----------------------------------                                                    
     ELSE                                                                                        // if there are less than 1 failures, set the main card details as this
-        LET CardMessage        = 'There are currently no task failures';                                           // card message
-        LET CardColor   = '$(iColor)';                                                                      // card color
-        LET CardSubTitle          = 'No Failures';                                                                    // sub title
+        LET CardMessage = 'There are currently no task failures';                               // card message
+        LET CardColor = '$(iColor)';                                                            // card color
+        LET CardSubTitle = 'No Failures';                                                       // sub title
     //----------------------------------------------------------------------------------------------------------------------------------------------    
     END IF;
     
@@ -236,22 +238,22 @@ SUB Notification
     // this section sets a variable and continually loops through a text concatenation 
     // to make a valid JSON response payload to insert into a later command
     //===================================================================================================================================================================
-    //----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>       do not change anything that is CONFIG
+    //----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>  ----->>                   do not change anything that is CONFIG
     
-    LET Payload2='{';                                                                                          //****************part of CONFIG
-    LET Payload2= Payload2 &'"@type": "MessageCard",';                                    //****************type of alert (CONFIG)
-    LET Payload2= Payload2 &'"@context": "http://schema.org/extensions",';                    //****************schema to use (CONFIG)
-    LET Payload2= Payload2 &'"summary": "Qlik Alert",';                                       //alert summary
-    LET Payload2= Payload2 &'"title": "'& '$(CardTitle)' &'",';             //main title
-    LET Payload2= Payload2 &'"text": "Alert Message from $(server)",';                        //server identification
-    LET Payload2= Payload2 &'"themeColor": "'& '$(CardColor)' &'",';      //color
-    LET Payload2= Payload2 &'"sections": [';                                                  //****************part of CONFIG
-    LET Payload2= Payload2 &'{';                                                              //****************part of CONFIG
-    LET Payload2= Payload2 &'"title": "'& '$(CardSubTitle)' &'",';                  //sub title
-    LET Payload2= Payload2 &'"text": "'&'<blockquote>'& '$(CardMessage)' &'</blockquote>'&'",';                 //card message
-    LET Payload2= Payload2 &'}';                                                              //****************part of CONFIG
-    LET Payload2= Payload2 &']';                                                              //****************part of CONFIG
-    LET Payload2= Payload2 &'}';                                                              //****************part of CONFIG
+    LET Payload2='{';                                                                           //****************part of CONFIG
+    LET Payload2= Payload2 &'"@type": "MessageCard",';                                          //****************type of alert (CONFIG)
+    LET Payload2= Payload2 &'"@context": "http://schema.org/extensions",';                      //****************schema to use (CONFIG)
+    LET Payload2= Payload2 &'"summary": "Qlik Alert",';                                         //alert summary
+    LET Payload2= Payload2 &'"title": "'& '$(CardTitle)' &'",';                                 //main title
+    LET Payload2= Payload2 &'"text": "Alert Message from $(server)",';                          //server identification
+    LET Payload2= Payload2 &'"themeColor": "'& '$(CardColor)' &'",';                            //color
+    LET Payload2= Payload2 &'"sections": [';                                                    //****************part of CONFIG
+    LET Payload2= Payload2 &'{';                                                                //****************part of CONFIG
+    LET Payload2= Payload2 &'"title": "'& '$(CardSubTitle)' &'",';                              //sub title
+    LET Payload2= Payload2 &'"text": "'&'<blockquote>'& '$(CardMessage)' &'</blockquote>'&'",'; //card message
+    LET Payload2= Payload2 &'}';                                                                //****************part of CONFIG
+    LET Payload2= Payload2 &']';                                                                //****************part of CONFIG
+    LET Payload2= Payload2 &'}';                                                                //****************part of CONFIG
 
 
     //====================================================================================================================================================================
