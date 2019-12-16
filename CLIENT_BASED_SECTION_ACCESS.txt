@@ -1,0 +1,68 @@
+//insert this line to call this script:
+//*************************************************************************************************
+//     $(Must_Include='lib://Qlik Network Folders\Application Scripts\UtilityScripts\CLIENT_BASED_SECTION_ACCESS.txt');
+//*************************************************************************************************
+
+
+//***********************************************|
+// this script requires ORGID to be the official |
+// name of the Odyssey Org ID field in order to  |
+// effectively and correctly secure client data  |
+//***********************************************|
+
+//------------------------------------SECTION ACCESS STARTS HERE--------------------
+    Trace '|make sure to user ORGID as the client field name|';
+     section access;
+
+    //----------ODYSSEY PRIMARY---------
+    //loading the primary NN section access table for Odyssey Users
+    //this section controls who within Odyssey can see data in the stas pack
+
+       
+        LOAD
+            "ACCESS",
+            "USERID",
+            "ORGID"
+        FROM [lib://Qlik Network Folders/3_External_Files\zStatsPackExtras\SectionAccessUsers.xlsx]
+        (ooxml, embedded labels, table is [Section Access])
+        ;
+    //-----------------------------------------------------------------------------
+
+    // // //-------USE THIS SECTION FOR TESTING ONLY-----------
+        // concatenate
+        // LOAD * inline [
+        // ACCESS, USERID, ORGID
+        // USER, NNUSERS_UDC\joeeasley@odysseylogistics.com,3061
+        // USER, NNUSERS_UDC\bmisasi@Odysseylogistics.com,4436
+        // ];
+    // // //-----------------------------------------------------
+
+
+    //-----------CLIENT PRIMARY---------
+    // this is the load of the NN user table for primary client 
+    // org id assignment.  the source qvd is generated automatically
+        concatenate
+        LOAD
+            'USER' as ACCESS,
+            'NNUSERS_UDC\' & USERNAME as USERID,
+            ORGID
+        FROM [lib://Qlik Network Folders/1_Source_QVD\Global\NN_USER_SA.qvd]
+        (qvd)
+        Where Not WildMatch(upper(USERNAME),'EASLEY');
+    //-----------------------------------
+
+    //-------CLIENT SECONDARY---------
+    // the reference file is where we load additional client access to the stats pack
+    // for client users that need acces to multiple orgs. the excel file is maintained
+    // manually on request of PM or other odyssey leadership
+        Concatenate
+        LOAD
+            'USER' as ACCESS,
+            'NNUSERS_UDC\' & USERNAME as USERID,
+            ORGID
+        FROM [lib://Qlik Network Folders/1_Source_QVD\Global\NN_SA_SUPPLEMENT.xlsx]
+        (ooxml, embedded labels, table is Sheet1);
+    //---------------------------------
+
+    section application;
+//---------------------------------------SECTION ACCESS ENDS HERE--------------------

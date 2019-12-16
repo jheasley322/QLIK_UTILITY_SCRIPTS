@@ -1,0 +1,102 @@
+//insert this line to call this script:
+//*************************************************************************************************
+//     $(Must_Include='lib://Qlik Network Folders\Application Scripts\UtilityScripts\FileStatus.qhb');
+//*************************************************************************************************
+
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$#,##0.00;-$#,##0.00';
+SET TimeFormat='h:mm:ss TT';
+SET DateFormat='YYYY-MM-DD';
+SET TimestampFormat='YYYY-MM-DD h:mm:ss[.fff] TT';
+SET FirstWeekDay=6;
+SET BrokenWeeks=1;
+SET ReferenceDay=0;
+SET FirstMonthOfYear=1;
+SET CollationLocale='en-US';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET LongMonthNames='January;February;March;April;May;June;July;August;September;October;November;December';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+SET LongDayNames='Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
+
+// SUB DoDir (Root)
+// LET vFirstLoop=1;
+// Let FileMask= Root &'\*.qvd';
+
+// FOR Each File in filelist (FileMask);
+  
+//   FileList:
+//   LOAD 
+//   '$(File)' as Name, 
+//   FileSize( '$(File)' ) as Size, 
+//   FileTime( '$(File)' ) as FileTime
+//   autogenerate 1;
+
+// NEXT File
+
+// END SUB
+
+// call DoDir('lib://Qlik Network Folders\1_Source_QVD');
+
+
+
+
+
+Set vConcatenate = ;
+FileList:
+LOAD
+'' AS SourceFile,
+'' as Time
+AUTOGENERATE 0;
+sub ScanFolder(Root)
+          for each FileExtension in 'qvd'
+                    for each FoundFile in filelist(Root & '\*.' & FileExtension)
+                              FileList:
+                              LOAD '$(FoundFile)' as SourceFile,
+                                    FileTime('$(FoundFile)') as Time
+       AUTOGENERATE 1;              
+                              Set vConcatenate = Concatenate;
+                    next FoundFile
+          next FileExtension
+          for each SubDirectory in dirlist( Root & '\*' )
+                    call ScanFolder(SubDirectory)
+          next SubDirectory
+end sub;
+
+Call ScanFolder('lib://Qlik Network Folders\1_Source_QVD');
+
+Store [FileList] into [lib://Qlik Network Folders\All_Files.qvd](qvd);
+Drop Table [FileList];
+
+
+FileData:
+LOAD
+    If(Wildmatch(FileName,'*TMP*','*tmp*'),0,
+    If(Match(HomeFolder2,'3YR') AND Len(HomeFolder3)<1,1,
+    If(Match(HomeFolder,'DW','NN','TMS') AND Len(HomeFolder2)<1,1,0))) as __check_this,
+    If(slashes>9,0,1) as __root_file,
+    If(Today=UpdateDate,1,0) as __updated_today,
+*;
+LOAD
+    1 as __file_count,
+    SourceFile,
+    Mid(
+        SourceFile,
+        index(SourceFile,'/',-1)+1) as FileName,
+    TextBetween(Mid(SourceFile,27),'/','/',2) as HomeFolder,
+    TextBetween(Mid(SourceFile,27),'/','/',3) as HomeFolder2,
+    TextBetween(Mid(SourceFile,27),'/','/',4) as HomeFolder3,
+    Len(KeepChar(SourceFile,'/')) as slashes,
+    "Time" as UpdateTime,
+    Interval(now()-"Time") as Age,
+    Date(Today()) as Today,
+    Date(floor(Time)) as UpdateDate
+FROM [lib://Qlik Network Folders/All_Files.qvd]
+(qvd);
+
+
+
+//lib://Qlik Network Folders/1_Source_QVD/BLS_FINAL.qvd

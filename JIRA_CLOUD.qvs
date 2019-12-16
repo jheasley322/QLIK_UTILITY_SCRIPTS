@@ -1,0 +1,1082 @@
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$#,##0.00;-$#,##0.00';
+SET TimeFormat='h:mm:ss TT';
+SET DateFormat='M/D/YYYY';
+SET TimestampFormat='M/D/YYYY h:mm:ss[.fff] TT';
+SET FirstWeekDay=6;
+SET BrokenWeeks=1;
+SET ReferenceDay=0;
+SET FirstMonthOfYear=1;
+SET CollationLocale='en-US';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET LongMonthNames='January;February;March;April;May;June;July;August;September;October;November;December';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+SET LongDayNames='Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
+SET NumericalAbbreviation='3:k;6:M;9:G;12:T;15:P;18:E;21:Z;24:Y;-3:m;-6:μ;-9:n;-12:p;-15:f;-18:a;-21:z;-24:y';
+
+// let mo_emea = 62;
+// let mo_apac = 38;
+// let mo_na = 125;
+
+
+Sub Limit
+    LIB CONNECT TO 'JIRA ISSUE COUNT (odysseylogistic_joeeasley)';
+    issuelimit:
+    SQL SELECT 
+        "__KEY_root",
+        (SELECT
+            "key" AS "key_u3"
+        FROM "issues" PK "__KEY_issues" FK "__FK_issues")
+    FROM JSON (wrap on) "root" PK "__KEY_root";
+
+    Let issuemax_t=peek('key_u3',0,'issuelimit');
+    Let issuemax=PurgeChar('$(issuemax_t)','QLIK-');
+    
+    Trace max issue id is $(issuemax);
+    // Drop Table issuelimit;
+End Sub;
+
+
+Sub GetIssues
+	Let issuenum=11;
+    Set errormode = 0;
+	
+    Do 
+        Call API_CALL($(issuenum))
+        Trace Finished with QLIK-$(issuenum);
+        Let issuenum = issuenum+1;
+        Trace Starting QLIK-$(issuenum);
+        Trace Issue $(issuenum) of $(issuemax);
+    Loop Until issuenum > issuemax;
+    
+    Set errormode = 1;
+    
+    full_list:
+    Load 
+        [@Value],
+        [@Value_u0],
+        [@Value_u1],
+        [@Value_u2],
+        [@Value_u3],
+        [@Value_u4],
+        [@Value_u5],
+        [@Value_u6],
+        [__extra_],
+        [__KEY_assignee],
+        [__KEY_author],
+        [__KEY_comment],
+        [__KEY_content],
+        [__KEY_creator],
+        [__KEY_customfield_10015],
+        [__KEY_description],
+        [__KEY_project],
+        [__KEY_reporter],
+        [__KEY_status],
+        [__KEY_updateAuthor],
+        [__KEY_worklog],
+        [__KEY_worklogs],
+        [16x16],
+        [16x16_u0],
+        [16x16_u1],
+        [16x16_u2],
+        [16x16_u3],
+        [16x16_u4],
+        [24x24],
+        [24x24_u0],
+        [24x24_u1],
+        [24x24_u2],
+        [24x24_u3],
+        [24x24_u4],
+        [32x32],
+        [32x32_u0],
+        [32x32_u1],
+        [32x32_u2],
+        [32x32_u3],
+        [32x32_u4],
+        [48x48],
+        [48x48_u0],
+        [48x48_u1],
+        [48x48_u2],
+        [48x48_u3],
+        [48x48_u4],
+        [accountId],
+        [accountId_u0],
+        [accountId_u1],
+        [accountId_u2],
+        [accountId_u3],
+        [accountType],
+        [accountType_u0],
+        [accountType_u1],
+        [accountType_u2],
+        [accountType_u3],
+        [active],
+        [active_u0],
+        [active_u1],
+        [active_u2],
+        [active_u3],
+        [aggregatetimeestimate],
+        [aggregatetimeoriginalestimate],
+        [aggregatetimespent],
+        [archived],
+        [archived_u0],
+        [avatarId],
+        [colorName],
+        [created],
+        [created_u0],
+        [customfield_10000],
+        [customfield_10001],
+        [customfield_10002],
+        [customfield_10003],
+        [customfield_10004],
+        [customfield_10005],
+        [customfield_10006],
+        [customfield_10007],
+        [customfield_10008],
+        [customfield_10009],
+        [customfield_10013],
+        [customfield_10014],
+        [customfield_10016],
+        [customfield_10017],
+        [customfield_10018],
+        [customfield_10019],
+        [customfield_10023],
+        [customfield_10024],
+        [customfield_10025],
+        [customfield_10028],
+        [customfield_10030],
+        [customfield_10033],
+        [customfield_10034],
+        [customfield_10036],
+        [customfield_10037],
+        [customfield_10038],
+        [customfield_10046],
+        [customfield_10047],
+        [customfield_10048],
+        [description],
+        [description_u0],
+        [description_u1],
+        [description_u2],
+        [displayName],
+        [displayName_u0],
+        [displayName_u1],
+        [displayName_u2],
+        [displayName_u3],
+        [duedate],
+        [environment],
+        [expand],
+        [hasEpicLinkFieldDependency],
+        [hasVoted],
+        [iconUrl],
+        [iconUrl_u0],
+        [iconUrl_u1],
+        [id],
+        [id_u0],
+        [id_u1],
+        [id_u2],
+        [id_u3],
+        [id_u4],
+        [id_u5],
+        [id_u6],
+        [id_u7],
+        [id_u8],
+        [issueId],
+        [isWatching],
+        [iteration],
+        [key],
+        [key_u0],
+        [key_u1],
+        [key_u2],
+        [key_u3],
+        [key_u4],
+        [key_u5],
+        [key_u6],
+        [lastViewed],
+        [maxResults],
+        [maxResults_u0],
+        [message],
+        [name],
+        [name_u0],
+        [name_u1],
+        [name_u10],
+        [name_u2],
+        [name_u3],
+        [name_u4],
+        [name_u5],
+        [name_u6],
+        [name_u7],
+        [name_u8],
+        [name_u9],
+        [originalEstimate],
+        [originalEstimateSeconds],
+        [percent],
+        [percent_u0],
+        [progress],
+        [progress_u0],
+        [projectTypeKey],
+        [reason],
+        [released],
+        [released_u0],
+        [releaseDate],
+        [releaseDate_u0],
+        [remainingEstimate],
+        [remainingEstimateSeconds],
+        [resolution],
+        [resolutiondate],
+        [self],
+        [self_u0],
+        [self_u1],
+        [self_u10],
+        [self_u11],
+        [self_u12],
+        [self_u13],
+        [self_u14],
+        [self_u15],
+        [self_u2],
+        [self_u3],
+        [self_u4],
+        [self_u5],
+        [self_u6],
+        [self_u7],
+        [self_u8],
+        [self_u9],
+        [showField],
+        [simplified],
+        [startAt],
+        [startAt_u0],
+        [started],
+        [statuscategorychangedate],
+        [subtask],
+        [summary],
+        [text],
+        [timeestimate],
+        [timeoriginalestimate],
+        [timeSpent],
+        [timeSpent_u0],
+        [timeSpentSeconds],
+        [timeSpentSeconds_u0],
+        [timeZone],
+        [timeZone_u0],
+        [timeZone_u1],
+        [timeZone_u2],
+        [timeZone_u3],
+        [total],
+        [total_u0],
+        [total_u1],
+        [total_u2],
+        [type],
+        [type_u0],
+        [type_u1],
+        [updated],
+        [updated_u0],
+        [value],
+        [version],
+        [votes],
+        [watchCount],
+        [workratio],
+        if(len([__KEY_fields])>0,iteration,null()) as [__KEY_fields],        
+        if(len([__FK_issuetype])>0,iteration,null()) as [__FK_issuetype],
+        if(len([__FK_avatarUrls])>0,iteration,null()) as [__FK_avatarUrls],
+        if(len([__FK_project])>0,iteration,null()) as [__FK_project],
+        if(len([__FK_fixVersions])>0,iteration,null()) as [__FK_fixVersions],
+        if(len([__FK_customfield_10035])>0,iteration,null()) as [__FK_customfield_10035],
+        if(len([__FK_watches])>0,iteration,null()) as [__FK_watches],
+        if(len([__FK_customfield_10022])>0,iteration,null()) as [__FK_customfield_10022],
+        if(len([__FK_priority])>0,iteration,null()) as [__FK_priority],
+        if(len([__FK_labels])>0,iteration,null()) as [__FK_labels],
+        if(len([__FK_versions])>0,iteration,null()) as [__FK_versions],
+        if(len([__FK_issuelinks])>0,iteration,null()) as [__FK_issuelinks],
+        if(len([__FK_avatarUrls_u0])>0,iteration,null()) as [__FK_avatarUrls_u0],
+        if(len([__FK_assignee])>0,iteration,null()) as [__FK_assignee],
+        if(len([__FK_statusCategory])>0,iteration,null()) as [__FK_statusCategory],
+        if(len([__FK_status])>0,iteration,null()) as [__FK_status],
+        if(len([__FK_components])>0,iteration,null()) as [__FK_components],
+        if(len([__FK_content_u0])>0,iteration,null()) as [__FK_content_u0],
+        if(len([__FK_content])>0,iteration,null()) as [__FK_content],
+        if(len([__FK_description])>0,iteration,null()) as [__FK_description],
+        if(len([__FK_nonEditableReason])>0,iteration,null()) as [__FK_nonEditableReason],
+        if(len([__FK_customfield_10015])>0,iteration,null()) as [__FK_customfield_10015],
+        if(len([__FK_timetracking])>0,iteration,null()) as [__FK_timetracking],
+        if(len([__FK_attachment])>0,iteration,null()) as [__FK_attachment],
+        if(len([__FK_avatarUrls_u1])>0,iteration,null()) as [__FK_avatarUrls_u1],
+        if(len([__FK_creator])>0,iteration,null()) as [__FK_creator],
+        if(len([__FK_subtasks])>0,iteration,null()) as [__FK_subtasks],
+        if(len([__FK_avatarUrls_u2])>0,iteration,null()) as [__FK_avatarUrls_u2],
+        if(len([__FK_reporter])>0,iteration,null()) as [__FK_reporter],
+        if(len([__FK_aggregateprogress])>0,iteration,null()) as [__FK_aggregateprogress],
+        if(len([__FK_customfield_10045])>0,iteration,null()) as [__FK_customfield_10045],
+        if(len([__FK_progress])>0,iteration,null()) as [__FK_progress],
+        if(len([__FK_votes])>0,iteration,null()) as [__FK_votes],
+        if(len([__FK_comments])>0,iteration,null()) as [__FK_comments],
+        if(len([__FK_comment])>0,iteration,null()) as [__FK_comment],
+       	if(len([__FK_avatarUrls_u3])>0,iteration,null()) as  [__FK_avatarUrls_u3],
+        if(len([__FK_author])>0,iteration,null()) as [__FK_author],
+        if(len([__FK_avatarUrls_u4])>0,iteration,null()) as [__FK_avatarUrls_u4],
+        if(len([__FK_updateAuthor])>0,iteration,null()) as [__FK_updateAuthor],
+        if(len([__FK_worklogs])>0,iteration,null()) as [__FK_worklogs],
+        if(len([__FK_worklog])>0,iteration,null()) as [__FK_worklog],
+        if(len([__FK_fields])>0,iteration,null()) as [__FK_fields],
+        iteration as [__KEY_root]
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML_QLIK*.qvd](qvd);
+    Store full_list into [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd);
+    Drop Table full_list;
+
+End Sub;
+
+Sub API_CALL(item_id)
+	
+    iteration:
+    Load * Inline [
+    iteration
+    $(item_id)
+    ];
+	Store iteration into [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/current iteration.qvd](qvd);
+
+	LIB CONNECT TO 'JIRA CLOUD (Issues) (odysseylogistic_joeeasley)';
+    NoConcatenate
+    RestConnectorMasterTable:
+    SQL SELECT 
+        "expand",
+        "id" AS "id_u8",
+        "self" AS "self_u15",
+        "key" AS "key_u6",
+        "__KEY_root",
+        (SELECT 
+            "statuscategorychangedate",
+            "timespent",
+            "customfield_10030",
+            "customfield_10033",
+            "aggregatetimespent",
+            "customfield_10034",
+            "resolution",
+            "customfield_10036",
+            "customfield_10037",
+            "customfield_10028",
+            "resolutiondate",
+            "workratio",
+            "lastViewed",
+            "created" AS "created_u0",
+            "customfield_10023",
+            "customfield_10024",
+            "customfield_10025",
+            "customfield_10016",
+            "customfield_10017",
+            "customfield_10018",
+            "customfield_10019",
+            "aggregatetimeoriginalestimate",
+            "timeestimate",
+            "updated" AS "updated_u0",
+            "timeoriginalestimate",
+            "customfield_10013",
+            "customfield_10014",
+            "customfield_10005",
+            "customfield_10006",
+            "customfield_10007",
+            "customfield_10008",
+            "aggregatetimeestimate",
+            "customfield_10009",
+            "summary",
+            "customfield_10000",
+            "customfield_10001",
+            "customfield_10046",
+            "customfield_10002",
+            "customfield_10047",
+            "customfield_10003",
+            "customfield_10004",
+            "customfield_10048",
+            "customfield_10038",
+            "environment",
+            "duedate",
+            "__KEY_fields",
+            "__FK_fields",
+            (SELECT 
+                "self",
+                "id",
+                "description",
+                "iconUrl",
+                "name",
+                "subtask",
+                "avatarId",
+                "__FK_issuetype"
+            FROM "issuetype" FK "__FK_issuetype"),
+            (SELECT 
+                "self" AS "self_u0",
+                "id" AS "id_u0",
+                "key",
+                "name" AS "name_u0",
+                "projectTypeKey",
+                "simplified",
+                "__KEY_project",
+                "__FK_project",
+                (SELECT 
+                    "48x48",
+                    "24x24",
+                    "16x16",
+                    "32x32",
+                    "__FK_avatarUrls"
+                FROM "avatarUrls" FK "__FK_avatarUrls")
+            FROM "project" PK "__KEY_project" FK "__FK_project"),
+            (SELECT 
+                "self" AS "self_u1",
+                "id" AS "id_u1",
+                "description" AS "description_u0",
+                "name" AS "name_u1",
+                "archived",
+                "released",
+                "releaseDate",
+                "__FK_fixVersions"
+            FROM "fixVersions" FK "__FK_fixVersions"),
+            (SELECT 
+                "@Value",
+                "__FK_customfield_10035"
+            FROM "customfield_10035" FK "__FK_customfield_10035" ArrayValueAlias "@Value"),
+            (SELECT 
+                "self" AS "self_u2",
+                "watchCount",
+                "isWatching",
+                "__FK_watches"
+            FROM "watches" FK "__FK_watches"),
+            (SELECT 
+                "self" AS "self_u3",
+                "id" AS "id_u2",
+                "description" AS "description_u1",
+                "name" AS "name_u2",
+                "archived" AS "archived_u0",
+                "released" AS "released_u0",
+                "releaseDate" AS "releaseDate_u0",
+                "__FK_customfield_10022"
+            FROM "customfield_10022" FK "__FK_customfield_10022"),
+            (SELECT 
+                "self" AS "self_u4",
+                "iconUrl" AS "iconUrl_u0",
+                "name" AS "name_u3",
+                "id" AS "id_u3",
+                "__FK_priority"
+            FROM "priority" FK "__FK_priority"),
+            (SELECT 
+                "@Value" AS "@Value_u0",
+                "__FK_labels"
+            FROM "labels" FK "__FK_labels" ArrayValueAlias "@Value_u0"),
+            (SELECT 
+                "@Value" AS "@Value_u1",
+                "__FK_versions"
+            FROM "versions" FK "__FK_versions" ArrayValueAlias "@Value_u1"),
+            (SELECT 
+                "@Value" AS "@Value_u2",
+                "__FK_issuelinks"
+            FROM "issuelinks" FK "__FK_issuelinks" ArrayValueAlias "@Value_u2"),
+            (SELECT 
+                "self" AS "self_u5",
+                "name" AS "name_u4",
+                "key" AS "key_u0",
+                "accountId",
+                "displayName",
+                "active",
+                "timeZone",
+                "accountType",
+                "__KEY_assignee",
+                "__FK_assignee",
+                (SELECT 
+                    "48x48" AS "48x48_u0",
+                    "24x24" AS "24x24_u0",
+                    "16x16" AS "16x16_u0",
+                    "32x32" AS "32x32_u0",
+                    "__FK_avatarUrls_u0"
+                FROM "avatarUrls" FK "__FK_avatarUrls_u0")
+            FROM "assignee" PK "__KEY_assignee" FK "__FK_assignee"),
+            (SELECT 
+                "self" AS "self_u7",
+                "description" AS "description_u2",
+                "iconUrl" AS "iconUrl_u1",
+                "name" AS "name_u6",
+                "id" AS "id_u5",
+                "__KEY_status",
+                "__FK_status",
+                (SELECT 
+                    "self" AS "self_u6",
+                    "id" AS "id_u4",
+                    "key" AS "key_u1",
+                    "colorName",
+                    "name" AS "name_u5",
+                    "__FK_statusCategory"
+                FROM "statusCategory" FK "__FK_statusCategory")
+            FROM "status" PK "__KEY_status" FK "__FK_status"),
+            (SELECT 
+                "@Value" AS "@Value_u3",
+                "__FK_components"
+            FROM "components" FK "__FK_components" ArrayValueAlias "@Value_u3"),
+            (SELECT 
+                "version",
+                "type" AS "type_u1",
+                "__KEY_description",
+                "__FK_description",
+                (SELECT 
+                    "type" AS "type_u0",
+                    "__KEY_content",
+                    "__FK_content",
+                    (SELECT 
+                        "type",
+                        "text",
+                        "__FK_content_u0"
+                    FROM "content" FK "__FK_content_u0")
+                FROM "content" PK "__KEY_content" FK "__FK_content")
+            FROM "description" PK "__KEY_description" FK "__FK_description"),
+            (SELECT 
+                "hasEpicLinkFieldDependency",
+                "showField",
+                "__KEY_customfield_10015",
+                "__FK_customfield_10015",
+                (SELECT 
+                    "reason",
+                    "message",
+                    "__FK_nonEditableReason"
+                FROM "nonEditableReason" FK "__FK_nonEditableReason")
+            FROM "customfield_10015" PK "__KEY_customfield_10015" FK "__FK_customfield_10015"),
+            (SELECT 
+                "originalEstimate",
+                "remainingEstimate",
+                "timeSpent",
+                "originalEstimateSeconds",
+                "remainingEstimateSeconds",
+                "timeSpentSeconds",
+                "__FK_timetracking"
+            FROM "timetracking" FK "__FK_timetracking"),
+            (SELECT 
+                "@Value" AS "@Value_u4",
+                "__FK_attachment"
+            FROM "attachment" FK "__FK_attachment" ArrayValueAlias "@Value_u4"),
+            (SELECT 
+                "self" AS "self_u8",
+                "name" AS "name_u7",
+                "key" AS "key_u2",
+                "accountId" AS "accountId_u0",
+                "displayName" AS "displayName_u0",
+                "active" AS "active_u0",
+                "timeZone" AS "timeZone_u0",
+                "accountType" AS "accountType_u0",
+                "__KEY_creator",
+                "__FK_creator",
+                (SELECT 
+                    "48x48" AS "48x48_u1",
+                    "24x24" AS "24x24_u1",
+                    "16x16" AS "16x16_u1",
+                    "32x32" AS "32x32_u1",
+                    "__FK_avatarUrls_u1"
+                FROM "avatarUrls" FK "__FK_avatarUrls_u1")
+            FROM "creator" PK "__KEY_creator" FK "__FK_creator"),
+            (SELECT 
+                "@Value" AS "@Value_u5",
+                "__FK_subtasks"
+            FROM "subtasks" FK "__FK_subtasks" ArrayValueAlias "@Value_u5"),
+            (SELECT 
+                "self" AS "self_u9",
+                "name" AS "name_u8",
+                "key" AS "key_u3",
+                "accountId" AS "accountId_u1",
+                "displayName" AS "displayName_u1",
+                "active" AS "active_u1",
+                "timeZone" AS "timeZone_u1",
+                "accountType" AS "accountType_u1",
+                "__KEY_reporter",
+                "__FK_reporter",
+                (SELECT 
+                    "48x48" AS "48x48_u2",
+                    "24x24" AS "24x24_u2",
+                    "16x16" AS "16x16_u2",
+                    "32x32" AS "32x32_u2",
+                    "__FK_avatarUrls_u2"
+                FROM "avatarUrls" FK "__FK_avatarUrls_u2")
+            FROM "reporter" PK "__KEY_reporter" FK "__FK_reporter"),
+            (SELECT 
+                "progress",
+                "total",
+                "percent",
+                "__FK_aggregateprogress"
+            FROM "aggregateprogress" FK "__FK_aggregateprogress"),
+            (SELECT 
+                "self" AS "self_u10",
+                "value",
+                "id" AS "id_u6",
+                "__FK_customfield_10045"
+            FROM "customfield_10045" FK "__FK_customfield_10045"),
+            (SELECT 
+                "progress" AS "progress_u0",
+                "total" AS "total_u0",
+                "percent" AS "percent_u0",
+                "__FK_progress"
+            FROM "progress" FK "__FK_progress"),
+            (SELECT 
+                "self" AS "self_u11",
+                "votes",
+                "hasVoted",
+                "__FK_votes"
+            FROM "votes" FK "__FK_votes"),
+            (SELECT 
+                "maxResults",
+                "total" AS "total_u1",
+                "startAt",
+                "__KEY_comment",
+                "__FK_comment",
+                (SELECT 
+                    "@Value" AS "@Value_u6",
+                    "__FK_comments"
+                FROM "comments" FK "__FK_comments" ArrayValueAlias "@Value_u6")
+            FROM "comment" PK "__KEY_comment" FK "__FK_comment"),
+            (SELECT 
+                "startAt" AS "startAt_u0",
+                "maxResults" AS "maxResults_u0",
+                "total" AS "total_u2",
+                "__KEY_worklog",
+                "__FK_worklog",
+                (SELECT 
+                    "self" AS "self_u14",
+                    "created",
+                    "updated",
+                    "started",
+                    "timeSpent" AS "timeSpent_u0",
+                    "timeSpentSeconds" AS "timeSpentSeconds_u0",
+                    "id" AS "id_u7",
+                    "issueId",
+                    "__KEY_worklogs",
+                    "__FK_worklogs",
+                    (SELECT 
+                        "self" AS "self_u12",
+                        "name" AS "name_u9",
+                        "key" AS "key_u4",
+                        "accountId" AS "accountId_u2",
+                        "displayName" AS "displayName_u2",
+                        "active" AS "active_u2",
+                        "timeZone" AS "timeZone_u2",
+                        "accountType" AS "accountType_u2",
+                        "__KEY_author",
+                        "__FK_author",
+                        (SELECT 
+                            "48x48" AS "48x48_u3",
+                            "24x24" AS "24x24_u3",
+                            "16x16" AS "16x16_u3",
+                            "32x32" AS "32x32_u3",
+                            "__FK_avatarUrls_u3"
+                        FROM "avatarUrls" FK "__FK_avatarUrls_u3")
+                    FROM "author" PK "__KEY_author" FK "__FK_author"),
+                    (SELECT 
+                        "self" AS "self_u13",
+                        "name" AS "name_u10",
+                        "key" AS "key_u5",
+                        "accountId" AS "accountId_u3",
+                        "displayName" AS "displayName_u3",
+                        "active" AS "active_u3",
+                        "timeZone" AS "timeZone_u3",
+                        "accountType" AS "accountType_u3",
+                        "__KEY_updateAuthor",
+                        "__FK_updateAuthor",
+                        (SELECT 
+                            "48x48" AS "48x48_u4",
+                            "24x24" AS "24x24_u4",
+                            "16x16" AS "16x16_u4",
+                            "32x32" AS "32x32_u4",
+                            "__FK_avatarUrls_u4"
+                        FROM "avatarUrls" FK "__FK_avatarUrls_u4")
+                    FROM "updateAuthor" PK "__KEY_updateAuthor" FK "__FK_updateAuthor")
+                FROM "worklogs" PK "__KEY_worklogs" FK "__FK_worklogs")
+            FROM "worklog" PK "__KEY_worklog" FK "__FK_worklog")
+        FROM "fields" PK "__KEY_fields" FK "__FK_fields")
+    FROM JSON (wrap on) "root" PK "__KEY_root"
+    WITH CONNECTION(URL "https://odysseyinsight.atlassian.net/rest/api/3/issue/QLIK-$(item_id)") ;
+    
+    
+    left join (RestConnectorMasterTable) Load * Resident iteration;
+    Store RestConnectorMasterTable into [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML_QLIK_$(item_id).qvd](qvd);
+    Drop tables iteration,RestConnectorMasterTable;
+    
+    
+End Sub;
+
+Sub Table_Rework
+	NoConcatenate
+    [fields]:
+    LOAD	
+        aggregatetimeestimate,
+        aggregatetimeoriginalestimate,
+        aggregatetimespent,
+        created_u0,
+        customfield_10000,
+        customfield_10009,
+        customfield_10016,
+        customfield_10017,
+        customfield_10019,
+        customfield_10023,
+        customfield_10024,
+        customfield_10046,
+        duedate,
+        iteration,
+        resolutiondate,
+        statuscategorychangedate,
+        summary,
+        timeestimate,
+        timeoriginalestimate,
+        updated_u0,
+        workratio,
+        __KEY_fields,
+        __FK_fields,
+        __KEY_root
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_fields])
+    ;
+    
+
+    // [root]:
+    trace adding expanded info;
+    Left Join (fields)
+    LOAD
+        [__KEY_root],	
+        // [expand],
+        [id_u8] AS [id_u8],
+        // [self_u15] AS [self_u15],
+        [key_u6] AS [key_u6]
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__KEY_root]);
+
+    // [issuetype]:
+    trace adding issue type;
+    Left Join (fields)
+    LOAD
+        [__FK_issuetype] AS [__KEY_fields],	
+        [self],
+        [id],
+        [description],
+        [iconUrl],
+        [name],
+        [subtask],
+        [avatarId]
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_issuetype]);
+
+
+    // [customfield_10035]:
+    trace adding custom 35;
+    Left Join (fields)
+    LOAD
+        [__FK_customfield_10035] AS [__KEY_fields],	
+        [@Value] as customfield_10035        
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_customfield_10035]);
+
+
+    // [customfield_10022]:
+    trace adding custom 22;
+    Left Join (fields)
+    LOAD	
+        [__FK_customfield_10022] AS [__KEY_fields],
+        // [self_u3],
+        [id_u2],
+        [description_u1] as "Expected Release",
+        [name_u2] as "PI Version",
+        [archived_u0],
+        [released_u0],
+        [releaseDate_u0]
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_customfield_10022]);
+
+
+    // [customfield_10045]:
+    trace adding custom 45;
+    Left Join (fields)
+    LOAD	
+        [__FK_customfield_10045] AS [__KEY_fields],
+        // [self_u10],
+        [value] as Region,
+        [id_u6]        
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_customfield_10045]);
+
+
+    // [assignee]:
+    trace adding assignee;
+    Left Join (fields)
+    LOAD	
+        [__FK_assignee] AS [__KEY_fields],
+        // [self_u5],
+        [name_u4] as "Assigned to ID",
+        [key_u0],
+        // [accountId],
+        [displayName] as "Assigned to User"
+        // [active],
+        // [timeZone],
+        // [accountType],
+        // [__KEY_assignee],
+        
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_assignee]);
+
+    
+    // [reporter]:
+    trace adding reporter;
+    Left Join (fields)
+    LOAD
+        [__FK_reporter] AS [__KEY_fields],	
+        // [self_u9],
+        // [name_u8],
+        // [key_u3],
+        // [accountId_u1],
+        [displayName_u1] as "Reported By"
+        // [active_u1],
+        // [timeZone_u1],
+        // [accountType_u1],
+        // [__KEY_reporter],
+
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_reporter]);
+
+    // // [fixVersions]:
+    // trace adding fix version;
+    // Left Join (fields)
+    // LOAD	
+    //     [__FK_fixVersions] AS [__KEY_fields],
+    //     // [self_u1],
+    //     [id_u1],
+    //     [description_u0] as "Initial Version",
+    //     [name_u1] as "Initial Release",
+    //     [archived]
+    //     // [released],
+    //     // [releaseDate],
+    // From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    // WHERE NOT IsNull([__FK_fixVersions]);
+
+    // [creator]:
+    trace adding creator;
+    Left Join (fields)
+    LOAD	
+        [__FK_creator] AS [__KEY_fields],
+        // [self_u8],
+        // [name_u7],
+        // [key_u2],
+        // [accountId_u0],
+        [displayName_u0] as "Created By"
+        // [active_u0],
+        // [timeZone_u0],
+        // [accountType_u0],
+        // [__KEY_creator],
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_creator]);
+
+
+    // [timetracking]:
+    trace adding time tracking;
+    Left Join (fields)
+    LOAD
+        [__FK_timetracking] AS [__KEY_fields],	
+        [originalEstimate],
+        [remainingEstimate],
+        [timeSpent],
+        [originalEstimateSeconds],
+        [remainingEstimateSeconds],
+        [timeSpentSeconds]
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_timetracking]);
+
+    // [customfield_10015]:
+    trace adding custom 15;
+    Left Join (fields)
+    LOAD	
+        [__FK_customfield_10015] AS [__KEY_fields],
+        [hasEpicLinkFieldDependency],
+        [showField],
+        [__KEY_customfield_10015]
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_customfield_10015]);
+
+    // [status]:
+    trace adding status;
+    Left Join (fields)
+    LOAD	
+        [__FK_status] AS [__KEY_fields],
+        [self_u7],
+        [description_u2],
+        [iconUrl_u1],
+        [name_u6],
+        [id_u5],
+        [__KEY_status] as [__FK_statusCategory]
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_status]);
+
+    // [statusCategory]:
+    trace adding status category;
+    Left Join (fields)
+    LOAD
+        [__FK_statusCategory],	
+        [self_u6],
+        [id_u4],
+        [key_u1],
+        [colorName],
+        [name_u5]
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_statusCategory]);
+
+    // [worklog]:
+    trace adding worklog link;
+    Left Join (fields)
+    LOAD
+        [__FK_worklog] AS [__KEY_fields],	
+        [startAt_u0],
+        [maxResults_u0],
+        [total_u2],
+        [__KEY_worklog] as [__FK_worklogs] 
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_worklog]);
+
+    store fields into [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/FINAL_LIST.qvd](qvd);
+	Drop Table fields;
+
+End Sub;
+
+Sub WorkLogging
+    trace adding issue worklogs;
+    [worklogs]:
+    LOAD
+        if(Date(Today())="Worklog Date",1,0) as _work_cd,
+        if(Weekname(Today())="Worklog Week",1,0) as _work_cw,
+        if(Monthname(Today())="Worklog Month",1,0) as _work_cm,
+        
+        if(addmonths(Date(Today()),-1)="Worklog Date",1,0) as _work_pd,
+        if(Weekname(addmonths(Today(),-1))=Weekname("Worklog Date"),1,0) as _work_pw,
+        if(Monthname(addmonths(Today(),-1))=Monthname("Worklog Date"),1,0) as _work_pm,
+        
+        if(AddMonths(Monthstart(Today()),-1)<="Worklog Date",1,0) as _recent,
+        *;
+    LOAD	
+        // [self_u14],
+        'QLIK-'&iteration  as "Issue ID",
+        MonthName(started) as "Worklog Month",
+        Weekname([started]) as "Worklog Week",
+        WeekDay(started) as "Worklog Day",
+        Date(Floor(started)) as "Worklog Date",
+        [updated],
+        [started],
+        [timeSpent_u0],
+        [timeSpentSeconds_u0],
+        [id_u7],
+        [issueId],
+        [__KEY_worklogs]
+    //         [__FK_worklogs]
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/RAW_XML.qvd](qvd)
+    WHERE NOT IsNull([__FK_worklogs]);
+
+End Sub;
+
+Sub Final
+
+    FINAL: 
+    Load
+        If(Match(__current_status_id,
+            10006,1,10007,3,
+            10000,10004),1,0)                           as __open_item,
+        If(Match(__current_status_id,
+            10003),1,0)                       	        as __cancelled_item,
+        If(Match(__current_status_id,
+            10005),1,0)                                 as __held_item,
+        If(Match(__current_status_id,
+            10012,10031,10002),1,0)                     as __completed_item,
+        If(Not Match(__current_status_id,10006,1,
+            10007,3,10000,10004,10003,10005,
+            10012,10031,10002),1,0)                     as __other_status_item,
+        If(len("Priority #")<1,0,
+            If(match("Priority #",'n/p'),0,1))          as __has_priority,  
+        If(len(__region_id)<1,0,1)                      as __has_region,   
+    *;
+    Load
+        __KEY_fields,
+        __FK_statusCategory,
+        __KEY_root,
+        aggregatetimeestimate,
+        aggregatetimeoriginalestimate,
+        aggregatetimespent,
+        created_u0,
+        // customfield_10000,
+        customfield_10009,
+        customfield_10016,
+        // customfield_10017,
+        // customfield_10019,
+        customfield_10023,
+        if(len(customfield_10024)<1,'not listed',
+            customfield_10024)                          as Requestor,
+        if(len(customfield_10046)<1,'n/p',
+            customfield_10046)                          as "Priority #",
+        duedate,
+        iteration,
+        resolutiondate,
+        statuscategorychangedate,
+        summary,
+        timeestimate,
+        timeoriginalestimate,
+        updated_u0,
+        workratio,
+        __FK_fields,
+        id_u8,
+        key_u6,
+        'QLIK-'&iteration                               as "Issue ID",
+        // self,
+        id                                              as __item_type_id,
+        // description,
+        // iconUrl,
+        name                                            as "Item Type",
+        // subtask,
+        // avatarId,
+        // customfield_10035,
+        // id_u2,
+        "Expected Release",
+        if(len("PI Version")<1,'not listed',
+        "PI Version")                                   as "PI Version",
+        // archived_u0,
+        released_u0                                     as "PI Release Closed",
+        // releaseDate_u0,
+        if(Len(Region)<1,'Unassigned',Region)           as Region,
+        id_u6                                           as __region_id,
+        // "Assigned to ID",
+        key_u0                                          as __assigned_to_id,
+        If(Len("Assigned to User")<1,'Unassigned',
+        	If(Match("Assigned to User",'Dev Team'),
+            'Unassigned',"Assigned to User"))           as "Assigned to User",
+        "Reported By",
+        "Created By",
+        originalEstimate,
+        remainingEstimate,
+        timeSpent,
+        originalEstimateSeconds,
+        remainingEstimateSeconds,
+        timeSpentSeconds,
+        hasEpicLinkFieldDependency,
+        showField,
+        __KEY_customfield_10015,
+        // self_u7,
+        description_u2                                  as "Status Description",
+        // iconUrl_u1,
+        name_u6                                         as "Current Status",
+        id_u5                                           as __current_status_id,
+        self_u6,
+        id_u4,
+        key_u1,
+        colorName,
+        name_u5,
+        startAt_u0,
+        maxResults_u0,
+        total_u2,
+        __FK_worklogs
+    From [lib://Qlik Network Folders/1_Source_QVD/JIRA_CLOUD/FINAL_LIST.qvd](qvd)
+    Where len(key_u6)>0;
+
+End Sub;
+
+Call Limit;
+Call GetIssues;
+Call Table_Rework;
+Call Final;
+Call WorkLogging;
+exit script;
+
+
+
+
+

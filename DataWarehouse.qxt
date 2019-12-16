@@ -1,0 +1,1628 @@
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$#,##0.00;($#,##0.00)';
+SET TimeFormat='h:mm:ss TT';
+SET DateFormat='YYYY-MM-DD';
+SET TimestampFormat='YYYY-MM-DD h:mm:ss[.fff] TT';
+SET FirstWeekDay=6;
+SET BrokenWeeks=1;
+SET ReferenceDay=0;
+SET FirstMonthOfYear=1;
+SET CollationLocale='en-US';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET LongMonthNames='January;February;March;April;May;June;July;August;September;October;November;December';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+SET LongDayNames='Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
+
+
+//insert this line to call this script:
+//*************************************************************************************************
+//     $(Must_Include='lib://Qlik Network Folders\Application Scripts\Extract\DataWarehouse.qxt');
+//*************************************************************************************************
+
+//--------ADD DATA CONNECTION HERE---------------
+LIB CONNECT TO 'DW_DB';
+
+// Setting to reload data in full or just partial
+
+//LET vReloadType = 0;  // uncomment this to force a specific reload type 
+// || 0 = Partial || 1 = History ||
+Let vMode = If(Match(Weekday(today()),'Sun'),1,0);
+Let vReloadType = $(vMode);
+//adding a comment===
+
+
+let Filepath = 'Qlik Network Folders\1_Source_QVD';
+let SourceFolder = 'DW';
+let HistoryYears= 3;
+
+
+//-----------------------------------------------------------------------------------------
+//***************************************GET HISTORY***************************************
+//######################## ADD CALLS FOR EACH TABLE IN THIS SECTION########################
+    SUB getHistory
+
+        //******************************************************************************
+        // 	Name:			getHistory
+        // 	Description: 	Gets all data from Start of the prior year and current year 
+        //					and saves a year-month qvd
+        //  Variable Info:  EndDate - should be the end of the current month
+        //                  MinDate - Historical  reload Start Date
+        //                  MaxDate - End of Month of MinDate
+        //                  YearMonth - used for naming QVDs
+        //******************************************************************************
+
+
+
+        LET vEndDate = Date(MonthEnd(Today()) + 1,'YYYY-MM-DD');
+        LET vMinDate = Date(AddYears(YearStart(vEndDate),-$(HistoryYears)),'YYYY-MM-DD');
+
+        LET vMaxDate 	= Date(MonthEnd(vMinDate) + 1,'YYYY-MM-DD');
+        LET vYearMonth 	= Year(vMinDate)&Num(Month(vMinDate),'00');
+
+        DO WHILE vEndDate >= vMaxDate
+            TRACE ;
+            TRACE Date >= $(vMinDate) AND Date < $(vMaxDate) Period $(vYearMonth);
+
+            // Getting data ranges by create date
+            //Set a Call Statement for each Table to be Extracted
+            //***************************************************
+            // TableName (pOwner,pTableName,pDateField)
+            //      pOwner = table owner/schema
+            //      pTableName = name of table within the schema
+            //      pDateField = key date that should be used in extraction
+            //      "pOwner"."pTableName" is inserted in the sql statement
+            //
+            // Each table needs to be extracted by YearMonth of a 
+            // key date field and stored out to a comon location
+            // for later concatenation
+            //***************************************************
+
+            //Call TableName ('pOwner','pTableName','pDateField')
+            // example       'reportdb','bnfi_invoice','create_date' 
+
+            Call LOAD_PLANNING_SHIPMENTS ('REPORTDB','LOAD_PLANNING_SHIPMENTS','LOAD_SHIP_DATE_PLAN_CTR')
+            Call NN_FREIGHT_CHARGE_USD ('REPORTDB','NN_FREIGHT_CHARGE_USD','BNFI_CREATE_DATE')
+            Call NN_SHIPMENT_INFO ('REPORTDB','NN_SHIPMENT_INFO','AI_ACTUALSHIPDATE')
+            Call LOAD_PLANNING_LEAD_TIME ('REPORTDB','LOAD_PLANNING_LEAD_TIME','MAX_OR_CREATE_DTSTMP_PLAN_CTR')
+            Call NN_FREIGHT_INVOICE_INFO ('REPORTDB','NN_FREIGHT_INVOICE_INFO','BNFI_CREATE_DATE')
+            //Call CLAIMS_AND_COMPLAINTS ('REPORTDB','CLAIMS_AND_COMPLAINTS','NCR_CREATE_DATE')
+            Call NN_PRESENTED_FRT_CHRG_USD ('REPORTDB','NN_PRESENTED_FRT_CHRG_USD','BNFI_CREATE_DATE')     
+            Call NN_INVOICE_TRACKING ('REPORTDB','NN_INVOICE_TRACKING','BNFI_INVOICE_RECV_DATE')      
+        
+            //Setting variables for next step
+            LET vMinDate 	= vMaxDate;
+            LET vMaxDate 	= Date(MonthEnd(vMinDate) + 1,'YYYY-MM-DD');
+            LET vYearMonth 	= Year(vMinDate)&Num(Month(vMinDate),'00'); // For qvd name
+        LOOP;
+
+    END SUB;
+//-----------------------------------------------------------------------------------------
+
+
+//-----------------------------------------------------------------------------------------
+//***********************************GET UPDATED*******************************************
+//######################## ADD CALLS FOR EACH TABLE IN THIS SECTION########################
+    SUB getUpdated
+
+        //******************************************************************************
+        // 	Name:			getUpdated
+        // 	Description: 	Gets only updated records based on the update date field and 
+        //					saves into the appropriate year-month qvd based on create date
+        //******************************************************************************
+
+        LET vMinDate = Date(Today()-5,'YYYY-MM-DD'); //Always gets 5 days before, just in case one day it did not run
+        LET vMaxDate = Date(Today()+1,'YYYY-MM-DD');
+
+        //*************************************************************************
+        // Call SubName('Owner','Tablename','KeyModifyDate');
+        // Call UpdateQvds('TableName','KeyDate','PrimaryKey')
+        //*************************************************************************
+
+        /*//TableName
+        Call SubName('Owner','Tablename','KeyModifyDate');
+        Call UpdateQvds('TableName','KeyDate','PrimaryKey') */
+
+        //LOAD_PLANNING_SHIPMENTS
+        Call LOAD_PLANNING_SHIPMENTS('REPORTDB','LOAD_PLANNING_SHIPMENTS','DATE_CUTOFF_LP_SHIP');
+        Call UpdateQvds('LOAD_PLANNING_SHIPMENTS','LOAD_SHIP_DATE_PLAN_CTR','LOAD_PLANNING_SHIPMENTS_ID');
+
+        //NN_FREIGHT_CHARGE_USD
+        Call NN_FREIGHT_CHARGE_USD('REPORTDB','NN_FREIGHT_CHARGE_USD','DATE_CUTOFF_NNIFC_USD');
+        Call UpdateQvds('NN_FREIGHT_CHARGE_USD','BNFI_CREATE_DATE','NN_FRT_INV_CHARGE_ID');
+
+        //NN_SHIPMENT_INFO
+        Call NN_SHIPMENT_INFO('REPORTDB','NN_SHIPMENT_INFO','DATE_CUTOFF_NNSI');
+        Call UpdateQvds('NN_SHIPMENT_INFO','AI_ACTUALSHIPDATE','NN_SHIPMENT_ID');
+
+        //ORDER_CREATE_MAX
+        Call LOAD_PLANNING_LEAD_TIME('REPORTDB','LOAD_PLANNING_LEAD_TIME','MAX_OR_CREATE_DTSTMP_PLAN_CTR');
+        Call UpdateQvds('LOAD_PLANNING_LEAD_TIME','MAX_OR_CREATE_DTSTMP_PLAN_CTR','ALD_ORD_ID');
+
+        //NN_FREIGHT_INVOICE_INFO
+        Call NN_FREIGHT_INVOICE_INFO('REPORTDB','NN_FREIGHT_INVOICE_INFO','DATE_CUTOFF_NNFI');
+        Call UpdateQvds('NN_FREIGHT_INVOICE_INFO','BNFI_CREATE_DATE','BNFI_INVOICE_ID');
+
+        //CLAIMS_AND_COMPLAINTS
+       // Call CLAIMS_AND_COMPLAINTS('REPORTDB','CLAIMS_AND_COMPLAINTS','DATE_CUTOFF_CLM');
+       // Call UpdateQvds('CLAIMS_AND_COMPLAINTS','NCR_CREATE_DATE','ODYSSEY_NCR_#');
+
+        //NN_PRESENTED_FRT_CHRG_USD
+        Call NN_PRESENTED_FRT_CHRG_USD('REPORTDB','NN_PRESENTED_FRT_CHRG_USD','DATE_CUTOFF_NNIFC_USD');
+        Call UpdateQvds('NN_PRESENTED_FRT_CHRG_USD','BNFI_CREATE_DATE','NN_FRT_INV_CHARGE_ID');
+
+        //NN_INVOICE_TRACKING
+        Call NN_INVOICE_TRACKING('REPORTDB','NN_INVOICE_TRACKING','DATE_CUTOFF_INV_TRACK');
+        Call UpdateQvds('NN_INVOICE_TRACKING','BNFI_INVOICE_RECV_DATE','NN_INV_TRACK_ID');
+        
+
+    END SUB;
+//-----------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------------------
+//*****************************************************************************************
+//***************************************TABLENAME*****************************************
+//**************************This section is a repeating section for************************
+//**************************each database table that needs extraction**********************
+
+
+    //SAMPLE HERE----------
+        /* //*********************************TABLENAME1*********************************
+        //**************************SAMPLE****SAMPLE****SAMPLE***************************
+        SUB TableName(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "Field_1", 
+                "Field_2", 
+                "Field_3"
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB; */
+    //---------------------
+
+    //***************************LOAD_PLANNING_SHIPMENTS*****************************
+        SUB LOAD_PLANNING_SHIPMENTS(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "QUERY_BLOCK", 
+                "LOAD_PLANNING_SHIPMENTS_ID", 
+                "LOAD_ID", 
+                "BILL_ID", 
+                "SHIPMENT_ID", 
+                "LCE_CARRIER_DIM_ID", 
+                "LCE_EQUIPMENT_DIM_ID", 
+                "ALD_CLIENT_TMS_DIM_ID", 
+                "FIRST_ORIGIN_ORG_DIM_ID", 
+                "LAST_DEST_ORG_DIM_ID", 
+                "FIRST_ORIGIN_LOC_DIM_ID", 
+                "LAST_DEST_LOC_DIM_ID", 
+                "ORDER_NO_LIST", 
+                "BILL_NO", 
+                "NO1_LCE_EQUIPMENT_DIM_ID_NU", 
+                "NO1_LCE_CARRIER_DIM_ID_NU", 
+                "PLAN_CTR", 
+                "PLAN_CTR_TMZ", 
+                "LOAD_TYPE", 
+                "LOAD_SHIP_DIRECTION", 
+                "ORDER_COUNT", 
+                "ORDER_LINE_DATA", 
+                "ORDER_REF_VALUES", 
+                "ORDER_LINE_REF_VALUES", 
+                "ORDER_RELEASE_COUNT", 
+                "LOAD_RECORD_STATUS", 
+                "LCE_ROW_STATUS", 
+                "LOAD_CREATE_DTSTMP_PLAN_CTR",
+                "LOAD_SHIP_DTSTMP_PLAN_CTR", 
+                "LOAD_SHIP_DATE_PLAN_CTR", 
+                "LOAD_SHIP_DTSTMP_LOCAL", 
+                "LOAD_SHIP_DATE_LOCAL", 
+                "LOAD_DELIVERY_DTSTMP_LOCAL", 
+                "LOAD_DELIVERY_DATE_LOCAL", 
+                "LOAD_CREATE_USER", 
+                "LOAD_PROCESS_STATUS", 
+                "LOAD_WEIGHT_LBS", 
+                "LOAD_WEIGHT_KGS", 
+                "LOAD_TOTAL_DISTANCE", 
+                "LOAD_UOM_DISTANCE", 
+                "LOAD_TRANSIT_TIME", 
+                "LOAD_UOM_TIME", 
+                "PRECONSOL_FREIGHT_COST", 
+                "CONSOL_FREIGHT_COST", 
+                "CUR_CODE", 
+                "PRECONSOL_FREIGHT_COST_USD", 
+                "PRECONSOL_FREIGHT_COST_EUR", 
+                "CONSOL_FREIGHT_COST_USD", 
+                "CONSOL_FREIGHT_COST_EUR", 
+                "HAZMAT_FLAG", 
+                "LOAD_FREIGHT_TERMS", 
+                "LCE_ORG_SUBSIDIARY_ID", 
+                "LCE_CREATE_DTSTMP_GMT", 
+                "DROPPED_CARRIER_COUNT", 
+                "DROPPED_CARRIERS", 
+                "LCE_RECORD_STATUS", 
+                "LCE_TENDER_STATUS", 
+                "LCE_CREATE_USER", 
+                "LCE_OCE_FLAG", 
+                "LCE_ORDER", 
+                "LCE_RT_PRIORITY", 
+                "LCE_QUOTE_CHANGE", 
+                "RATE_CHANGE_COUNTER", 
+                "LCE_CONSIGNEE_PFC_FLAG", 
+                "LCE_RATED_AMOUNT", 
+                "LCE_CUR_RATED_CODE", 
+                "LCE_COMPARISON_AMOUNT", 
+                "LCE_RATED_AMOUNT_USD", 
+                "LCE_RATED_AMOUNT_EUR", 
+                "LCE_NOTIFICATION_METHOD", 
+                "LCE_NOTIFY_DTSTMP_GMT", 
+                "LCE_NOTIFY_DTSTMP_PLAN_CTR", 
+                "LCE_RESPONSE_METHOD", 
+                "LCE_RESPONSE_DTSTMP_GMT", 
+                "LCE_RESPONSE_DTSTMP_PLAN_CTR", 
+                "LCE_CARRIER_RESPONSE_HRS", 
+                "LCE_RESPONSE_REASON", 
+                "LCE_REASON_DESCRIPTION", 
+                "LCE_WORK_PROCESS_CATEGORY", 
+                "LCE_NOTIFY_CUTOFF_DATE", 
+                "LCE_RG_COMPLETE_FOR_ROW", 
+                "PFC_FLAG", 
+                "PLANNING_LEAD_TIME_CATEGORY", 
+                "CARRIER_LEAD_TIME_CATEGORY", 
+                "PFC_LEAD_TIME_CATEGORY", 
+                "ACTUAL_LEAD_TIME_CATEGORY", 
+                "NOTIFY_TO_PICKUP_HRS", 
+                "NO1_LCE_NOTIFY_TO_PICKUP_HRS", 
+                "NO1_LCE_TENDER_STATUS", 
+                "NO1_LCE_CREATE_USER", 
+                "NO1_LCE_OCE_FLAG", 
+                "NO1_LCE_ORDER", 
+                "NO1_LCE_RT_PRIORITY", 
+                "NO1_LCE_QUOTE_CHANGE", 
+                "NO1_LCE_CONSIGNEE_PFC_FLAG", 
+                "NO1_LCE_NOTIFY_DTSTMP_PLAN_CTR", 
+                "NO1_LCE_RATED_AMOUNT", 
+                "NO1_LCE_CUR_RATED_CODE", 
+                "NO1_LCE_COMPARISON_AMOUNT", 
+                "NO1_LCE_CARRIER_RESPONSE_HRS", 
+                "NO1_LCE_RESPONSE_REASON", 
+                "NO1_LCE_REASON_DESCRIPTION", 
+                "NO1_LCE_WORK_PROCESS_CATEGORY", 
+                "NO1_LCE_RG_COMPLETE_FOR_ROW", 
+                //"BILL_SHIP_DATE", //DPT
+                TO_CHAR("BILL_SHIP_DATE",'YYYY-MM-DD') AS "BILL_SHIP_DATE",
+                "BILL_FREIGHT_ACCRUED", 
+                "MULTI_STOP_FLAG", 
+                "LOAD_STOPOFFS", 
+                "OD_PAIR_LIST", 
+                "LOAD_SEQUENCE", 
+                "LOAD_DISTANCE", 
+                "TEMP_SENSITIVITY_UF1", 
+                "CONTACT_UF2", 
+                "DATE_AVAILABLE_UF3", 
+                "PICKUP_NUMBER_UF4", 
+                "PRO_NUMBER_UF5", 
+                "STATUS1_UF6", 
+                "STATUS2_UF7", 
+                "TRAILER_LOADED_UF8", 
+                "NJ_OFFICE_UF9", 
+                "TRANSACTION_ID_UF10", 
+                "OD_PAIR", 
+                "ORDER_CREATE_DATE", 
+                "SINGLE_COUNTER", 
+                "CONSOL_COUNTER", 
+                "ORDER_CREATE_USER", 
+                "ORDER_ENTRY_METHOD", 
+                "AUTO_ORDER_COUNTER", 
+                "MAN_ORDER_COUNTER",
+                "TENDER_LIST", 
+                "TENDER_TYPE", 
+                "TENDER_COUNT", 
+                "AUTO_COUNTER", 
+                "MANUAL_COUNTER", 
+                "LCE_DECLINE_COUNT", 
+                "LCE_CANCEL_COUNT", 
+                "TENDER_RESPONSE_GROUP", 
+                "SHORT_LEAD_DECLINE", 
+                "DISTANCE_BAND", 
+                "PLANNING_LEAD_TIME", 
+                "CARRIER_LEAD_TIME", 
+                "ACTUAL_LEAD_TIME", 
+                "DATE_CUTOFF_LP_SHIP"   
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    //****************************NN_FREIGHT_CHARGE_USD******************************
+        SUB NN_FREIGHT_CHARGE_USD(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "QUERY_BLOCK", 
+                "NN_FRT_INV_CHARGE_ID", 
+                "NN_FRT_INV_ID", 
+                "BNFI_INVOICE_ID", 
+                "BNFI_ID", 
+                "BNFI_BOLID", 
+                "NN_SHIPMENT_ID", 
+                "NNIFC_CURRENCY", 
+                "NN_CURRENT_AUDIT_STATUS", 
+                TO_CHAR("BNFI_CREATE_DATE",'YYYY-MM-DD') as "BNFI_CREATE_DATE",
+                "USD_TO_EUR_EXCH_RATE", 
+                "BNFI_AMOUNT_USD", 
+                "USD_TO_FI_EXCH_RATE", 
+                "BNFIC_CHARGETYPE", 
+                "BNFIC_AMOUNT", 
+                "BNFIC_AMOUNT_CURRENCY", 
+                "BNFIC_DESCRIPTION", 
+                "BNFIC_AMOUNT_USD", 
+                "BASE_RATE_METHOD", 
+                "ACTUAL_PROCESSED_CURRENCY", 
+                "ACCRUAL_CURRENCY", 
+                "ACTUAL_PROCESSED_AMOUNT_USD", 
+                "BNFI_FREIGHTESTAMOUNT_USD", 
+                "BNFI_TOTALCHARGEAMOUNT_USD", 
+                "USD_TO_ACCRUAL_EXCH_RATE", 
+                "FREIGHT_CLASS", 
+                TO_CHAR("DATE_CUTOFF_NNIFC_USD",'YYYY-MM-DD') as "DATE_CUTOFF_NNIFC_USD"
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    //*****************************NN_SHIPMENT_INFO*********************************
+        SUB NN_SHIPMENT_INFO(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "NNSI_ID_XA", 
+                "SHIPKEY", 
+                "NN_SHIPMENT_ID", 
+                "SHIPMENTID", 
+                "ORGID", 
+                "REFID", 
+                "ORIGIN_ORGID", 
+                "DEST_ORGID", 
+                "PO_NUMBER", 
+                "REFNO", 
+                "FORWARDERREFNO", 
+                "CARRIERBOLNUMBER", 
+                "INMASTER", 
+                "PLAN_SHIP_NO", 
+                "MASTER_SHIPMENT_NUMBER", 
+                "TRACKINGNO", 
+                "PRO_NUMBER", 
+                "BOLNUMBER", 
+                "ORDERNUMBER", 
+                "CONSOLIDATION_FLAG", 
+                "OI_LAREDO_TX_FLAG", 
+                "NN_CLIENT", 
+                "INFOMODE", 
+                "INFOMODEID", 
+                "CURRENCY", 
+                "EQUIPMENT", 
+                "SHIPMENT_TYPE", 
+                "SUBSHIPMENTCOUNT", 
+                "EQUIPMENTID", 
+                "DOC_TYPE", 
+                "MOVETYPE", 
+                "DDPIER_CUTOFF_DATE", 
+                "NUMBEROFSTOPS", 
+                "MASTER_SHIPMENT_DATE", 
+                "CREATETIME", 
+                "CREATEDATE", 
+                "TOTAL_PALLET_COUNT", 
+                "TRAILER_NUMBER", 
+                "SHIP_DIRECTION", 
+                "VESSEL", 
+                "VOYAGENUMBER", 
+                "INCOTERM", 
+                "INCOTERMINFO", 
+                "INCOTERMDESCRIPTION", 
+                "PORTOFLOADINGID", 
+                "PORTOFLOADING", 
+                "PORTOFLOADINGNAME", 
+                "PORTOFDISCHARGEID", 
+                "PORTOFDISCHARGE", 
+                "PORTOFDISCHARGENAME", 
+                "ESTIMATED_SAIL_DATE", 
+                "ESTIMATED_ARRIVAL_DATE", 
+                "OCEANSHIPMENTDATE", 
+                "CARRIER", 
+                "CARRIERID", 
+                "SHIPFROM_NAME", 
+                "ORIGIN_ADDRESS1", 
+                "ORIGIN_ADDRESS2", 
+                "ORIGIN_ADDRESS3", 
+                "ORIGIN_COUNTRY", 
+                "ORIGIN_STATE", 
+                "NN_ORIGIN_CITY", 
+                "ORIGIN_ZIP", 
+                "SHIPTO_NAME", 
+                "SHIPTO_ADDRESS1", 
+                "DEST_ADDRESS1", 
+                "DEST_ADDRESS2", 
+                "DEST_ADDRESS3", 
+                "DEST_COUNTRY", 
+                "DEST_STATE", 
+                "NN_DEST_CITY", 
+                "DEST_ZIP", 
+                "IS_BOL_INTERNAL", 
+                "DDBOOKINGREVISION", 
+                "DDBOOKINGREVISIONDESC", 
+                "HAZARDOUS", 
+                "DOCUMENTSTRACKNO", 
+                "DISPATCHEDDATE", 
+                "DDDOCUMENTCUTOFFDATE", 
+                "FREIGHTESTIMATETOTAL", 
+                "FREIGHTESTIMATETTLCURRNCY", 
+                "RATED_FREIGHT_COST_USD", 
+                "FRT_ESTMT_LOCKED", 
+                "FRT_ESTMT_STATUS", 
+                "FRT_ESTMT_SENT_DATE", 
+                "SHIPPED", 
+                "RECORD_SYSTEM", 
+                "RELATED_FREIGHT_INVOICES", 
+                "FICOUNT", 
+                "FITOTAL", 
+                "FITOTALCURRNCY", 
+                "FITOTAL_USD", 
+                "ARCOUNT", 
+                "ARTOTAL", 
+                "ARTOTALCURR", 
+                "ARTOTAL_USD", 
+                "APCOUNT", 
+                "APTOTAL", 
+                "APTOTALCURR", 
+                "APTOTAL_USD", 
+                "CUSTINVCOUNT", 
+                "CUSTINVOICENOS", 
+                "CUSTINVTOTAL", 
+                "CUSTINVTOTALCURRNCY", 
+                "CUSTINVTOTAL_USD", 
+                "APRVDPYMNTCOUNT", 
+                "APRVDPYMTTOTAL", 
+                "APRVDPYMTTOTALCURRNCY", 
+                "APRVDPYMTTOTAL_USD", 
+                "TRANSPORTMODE", 
+                "SPOT", 
+                "COMMINVOICENUMBER", 
+                "COMMINVOICEDATE", 
+                "HISTDEPTH", 
+                "RATESOURCE", 
+                "SABICACCTNUMBER", 
+                "SHIPFROM_SITE_ID", 
+                "DELIVERIES", 
+                "AI_BOOKINGNUMBER", 
+                "DDPLACEOFRECEIPT", 
+                "DISCHARGETERMINAL", 
+                "FREIGHTESTIMATEPREPAID", 
+                "FREIGHTESTIMATECOLLECT", 
+                "DDPRECARRIAGECOST", 
+                "DDPRECARRIAGECOSTUNIT", 
+                "AI_ESTIMATEDARRIVALDATE", 
+                "DDGROSSWEIGHT", 
+                "DDGROSSWEIGHTUNIT", 
+                "CONSIGNEE_NAME", 
+                "CONSIGNEE_ADDRESS1", 
+                "SHIPPER_NAME", 
+                "SHIPTO_SITE_ID", 
+                "ORIGIN", 
+                "UPDATETIME", 
+                "CONSOL", 
+                "EQUIPMENTNUMBER", 
+                "DESTINATION", 
+                "TOTALPACKAGES", 
+                "AI_ACTUALSHIPDATE", 
+                "AI_ORDERNUMBER", 
+                "SHIPFROM_PARTNERID", 
+                "PLACEOFRECEIPTUNLOCNAME", 
+                "PLACEOFRECEIPTUNLOCID", 
+                "RATED_WEIGHT", 
+                "RATED_WEIGHTUNIT", 
+                "VATNUMBER", 
+                "BILLTO_NAME", 
+                "SUMMARYDESCOFGOODS", 
+                "SOURCEID", 
+                "DDNETWEIGHT", 
+                "DDNETWEIGHTUNIT", 
+                "TOTAL_WEIGHT_UNIT", 
+                "BILL_NET_WT_KGS", 
+                "BILL_NET_WT_LBS", 
+                "ORIGIN_JTIMEZONE_TZNAME", 
+                "DEST_JTIMEZONE_TZNAME", 
+                "RATED_FREIGHT_COST_EUR", 
+                "APRVDPYMTTOTAL_EUR", 
+                "FITOTAL_EUR", 
+                "ARTOTAL_EUR", 
+                "APTOTAL_EUR", 
+                "CUSTINVTOTAL_EUR", 
+                "AI_SHIPMENTDATE", 
+                "FREIGHTRATE", 
+                "BROKERAGEAMOUNT", 
+                "XB_FREIGHT_COST", 
+                "BNC_DISTANCE", 
+                "TOTAL_GROSS_WEIGHT", 
+                "WEIGHT_BREAK", 
+                "DISTANCE_BAND", 
+                "TOTAL_VOLUME", 
+                "PGIDATE", 
+                "ACTUALSHIPDATE", 
+                "REQUIRED_DELIVERY_DATE", 
+                "SCHEDULEDSHIPDATE", 
+                "SCHEDULEDDELIVERYDATE", 
+                "TRANSIT_TIME", 
+                "TRANSIT_TIME_UNIT", 
+                "EXPORTINGCARRIERNAME", 
+                "SALESORDERNUMBER", 
+                "AI_SALEUNITS", 
+                "AI_SALESUNITOFMEASURE", 
+                "FREIGHTRATEUNIT", 
+                "BROKERAGEAMOUNTUNIT", 
+                "TOTAL_GROSS_WEIGHT_UNIT", 
+                "BOOKINGNUMBER", 
+                "RATING_STATUS", 
+                "TOTAL_VOLUME_UNIT", 
+                "XB_FREIGHT_COST_UNIT", 
+                "DISTANCEUNIT", 
+                "TOTAL_GROSS_WT_LBS", 
+                "TOTAL_GROSS_WT_KGS", 
+                "ORIGIN_CITY", 
+                "DEST_CITY", 
+                "PAYMENT_TERMS", 
+                "US_IMPORT_EXPORT_FLAG", 
+                "REVIEW_WT_FLAG", 
+                "LANE_LOOKUP", 
+                "OI_FLAG", 
+                "DATE_CUTOFF_NNSI" 
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    //*****************************ORDER_CREATE_MAX*********************************
+        SUB LOAD_PLANNING_LEAD_TIME(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "ALD_ORD_ID", 
+                "ALD_ORDER_NO", 
+                "LOAD_LCE_LOAD_ID", 
+                "MAX_OR_CREATE_DTSTMP_GMT", 
+                "MAX_OR_CREATE_DTSTMP_PLAN_CTR" 
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    //*************************NN_FREIGHT_INVOICE_INFO******************************
+        SUB NN_FREIGHT_INVOICE_INFO(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "BNFI_ID", 
+                "BNFI_INVOICE_ID", 
+                "BNFI_BOLID", 
+                "NN_SHIPMENT_ID", 
+                "BNFI_ORGID", 
+                "BNFI_ORIGINID", 
+                "BNFI_DESTINATIONID", 
+                "BNFI_OD_PAIR_ID", 
+                "NN_FRT_INV_ID", 
+                "NNFI_NNA_MATCH", 
+                "BNFI_CARRIER_INVOICE", 
+                "BNFI_PRO_NO", 
+                "BNFI_BOLNUMBER", 
+                "BNFI_PURCHASE_ORDER", 
+                "BNFI_CARRIER_BOL_NO", 
+                "BNFI_VAT_NUMBER", 
+                "BNFI_AUDIT_SYSTEM", 
+                "BNFI_CLIENT", 
+                "BNFI_SCAC", 
+                "BNFI_SHIP_DIR", 
+                "BNFI_SHIP_DIR_DESC", 
+                TO_CHAR("BNFI_INVOICE_DATE",'YYYY-MM-DD') as "BNFI_INVOICE_DATE", 
+                TO_CHAR("BNFI_INVOICE_RECV_DATE",'YYYY-MM-DD') as "BNFI_INVOICE_RECV_DATE",
+                TO_CHAR("BNFI_CARRIER_SHIP_DATE",'YYYY-MM-DD') as "BNFI_CARRIER_SHIP_DATE", 
+                TO_CHAR("BNFI_SHIP_DATE",'YYYY-MM-DD') as "BNFI_SHIP_DATE",
+                TO_CHAR("BNFI_CARRIER_DELIVERY_DATE",'YYYY-MM-DD') as "BNFI_CARRIER_DELIVERY_DATE",
+                "PAYMENTTERMSCODE", 
+                "BNFI_LAST_AUDIT_DATE", 
+                "BNFI_AUDIT_DONE_DATE", 
+                "BNFI_STATUS_CHANGE_DATE", 
+                TO_CHAR("BNFI_PAYMENT_DUE_DATE",'YYYY-MM-DD') as "BNFI_PAYMENT_DUE_DATE",  
+                "BNFI_CURRENCY", 
+                "BNFI_BILLED_WEIGHT", 
+                "BNFI_BILLED_UOM_WEIGHT", 
+                "BNFI_ACTUAL_WEIGHT", 
+                "BNFI_ACTUAL_UOM_WEIGHT", 
+                "BNFI_PACKAGECOUNT", 
+                "BNFI_VOLUME", 
+                "BNFI_ENTRY_METHOD", 
+                "BNFI_CREATE_DTSTMP", 
+                "BNFI_SHIP_FROM_NAME", 
+                "BNFI_SHIP_TO_NAME", 
+                "BNFI_DISTANCE", 
+                "BNFI_UPDATE_USER", 
+                "TMS_OWNING_ORG", 
+                TO_CHAR("BNFI_CREATE_DATE",'YYYY-MM-DD') as "BNFI_CREATE_DATE",
+                TO_CHAR("BNFI_UPDATE_DATE",'YYYY-MM-DD') as "BNFI_UPDATE_DATE",
+                "BNFI_UPDATE_DTSTMP", 
+                "BNFI_AMOUNT", 
+                "BNFI_UOM_DISTANCE", 
+                "BNFI_RATE_TYPE", 
+                "BNFI_CARRIER_NAME", 
+                "BNFI_ERRORCODE", 
+                "BNFI_ERROR_REASON", 
+                "BNFI_PORT_OF_LOADING", 
+                "BNFI_PORT_OF_UNLOADING", 
+                "BNFI_SOURCEID", 
+                "SUBSIDIARY", 
+                "BNFI_BUSINESS_MODEL", 
+                "BNFI_SHIP_MODE", 
+                "BNFI_CURRENT_AUDIT_STATUS", 
+                "BNFI_VOLUMEUNIT", 
+                "BNFI_HAZARD", 
+                "MATCHED_TO_BOL", 
+                "BNFI_OD_PAIR_NAME_ID", 
+                "BNFI_NN_CLIENT", 
+                "OPS_CLIENT_NAME", 
+                "TMS_CLIENT_MATCH", 
+                "BNFI_AMOUNT_USD", 
+                "BNFI_AMOUNT_EUR", 
+                "BNFI_AMOUNT_IN_ACCRUAL_CUR", 
+                "FI_REJECT_CODE", 
+                "FI_REJECT_COMMENT", 
+                "NET_BASE_CHARGE_USD", 
+                "FUEL_SURCHARGE_USD", 
+                "OTHER_CHARGES_USD", 
+                "NET_BASE_CHARGE_EUR", 
+                "FUEL_SURCHARGE_EUR", 
+                "OTHER_CHARGES_EUR", 
+                "FIRST_CRS_OPEN_DATE", 
+                "LAST_CRS_RESOLVED_DATE", 
+                "CRS_RESOLUTION", 
+                "EVER_ON_CRS_HOLD", 
+                "CRS_ISSUE_COUNT", 
+                "CRS_OPEN_USER", 
+                "UX1_NAME", 
+                "UX1_VALUE", 
+                "UX2_NAME", 
+                "UX2_VALUE", 
+                "UX3_NAME", 
+                "UX3_VALUE", 
+                "UX4_NAME", 
+                "UX4_VALUE", 
+                "UX5_NAME", 
+                "UX5_VALUE", 
+                "UX6_NAME", 
+                "UX6_VALUE", 
+                "UX7_NAME", 
+                "UX7_VALUE", 
+                "UX8_NAME", 
+                "UX8_VALUE", 
+                "UX9_NAME", 
+                "UX9_VALUE", 
+                "UX10_NAME", 
+                "UX10_VALUE", 
+                "UX11_NAME", 
+                "UX11_VALUE", 
+                "UX12_NAME", 
+                "UX12_VALUE", 
+                "UX13_NAME", 
+                "UX13_VALUE", 
+                "UX14_NAME", 
+                "UX14_VALUE", 
+                "UX15_NAME", 
+                "UX15_VALUE", 
+                "UX16_NAME", 
+                "UX16_VALUE", 
+                "UX17_NAME", 
+                "UX17_VALUE", 
+                "UX18_NAME", 
+                "UX18_VALUE", 
+                "UX19_NAME", 
+                "UX19_VALUE", 
+                "UX20_NAME", 
+                "UX20_VALUE", 
+                "PI_USER1", 
+                "PI_USER1_DATE", 
+                "PI_BATCH_ID", 
+                "ORIGIN_ZIP", 
+                "ORIGIN_CITY", 
+                "ORIGIN_STATE", 
+                "ORIGIN_COUNTRY", 
+                "OD_PAIR", 
+                "FI_ORIGIN_ADDR1", 
+                "FI_ORIGIN_ADDR2", 
+                "DEST_ZIP", 
+                "DEST_CITY", 
+                "DEST_STATE", 
+                "DEST_COUNTRY", 
+                "FI_DEST_ADDR1", 
+                "FI_DEST_ADDR2", 
+                "ACTUAL_PROCESSED_AMOUNT", 
+                "ACTUAL_PROCESSED_CURRENCY", 
+                "ERROR_GROUP_LIST", 
+                "BNFI_EQUIPMENT_NO", 
+                "HAD_AN_ERROR", 
+                "INTERNAL_BOL_FLAG", 
+                "BNFI_DAYS_SINCE_SHIPPED", 
+                "BNFI_DAYS_TO_ENTER", 
+                "BNFI_EQUIPMENT_TYPE", 
+                "BNFI_INVOICE_AGE", 
+                "DAYS_SINCE_LAST_UPDATE", 
+                "BNFI_DAYS_TO_PROCESS", 
+                "BNFI_BILLED_WEIGHT_LBS", 
+                "BNFI_BILLED_WEIGHT_KGS", 
+                "DAYS_CRS_ISSUE_OPEN", 
+                "PO_NUMBER", 
+                "BNFI_CREATE_USER", 
+                "DATE_CUTOFF_NNFI"
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    //**************************CLAIMS_AND_COMPLAINTS*******************************
+        SUB CLAIMS_AND_COMPLAINTS(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "CONST", 
+                "NCR_CLIENT_TMS_DIM_ID", 
+                "NCR_CARRIER_DIM_ID", 
+                "NCR_EQUIPMENT_DIM_ID", 
+                "NCR_ORIGIN_ORG_DIM_ID", 
+                "NCR_ORIGIN_LOC_DIM_ID", 
+                "NCR_DEST_ORG_DIM_ID", 
+                "NCR_DEST_LOC_DIM_ID", 
+                "CORRECTIVE_ACTION_CODE", 
+                "OT_NON_NEAR_MISS_CODE", 
+                "CLI_CLM_CLAIM_ID", 
+                "CLMA_CLM_CLAIM_ID", 
+                "OT_NEAR_MISS_CODE", 
+                "CLAIM_ORIGINATOR_CODE", 
+                "SITE_REG_CODE", 
+                "DOT_DETAIL_CODE", 
+                "MISSING_PPE_CODE", 
+                "MISSING_PAPERWORK_CODE", 
+                "LADING_SECURITY_CODE", 
+                "HAZARD_CODE", 
+                "EQUIP_FAILURE_CODE", 
+                "CONTAMINATION_CODE", 
+                "ACCIDENT_TYPE_CODE", 
+                "ACCIDENT_PROP_DAMAGE_CODE", 
+                "ACCIDENT_PROD_DETAIL_CODE", 
+                "CIL_CLI_CLAIM_ID", 
+                "CLAIM_STATUS_CODE", 
+                "RESPONSIBLE_PARTY_CODE", 
+                "ROOT_CAUSE_CODE", 
+                "ODYSSEY_NCR_#", 
+                "ALD_ID", 
+                "ACOL_ID", 
+                "CMOP_ID", 
+                "BOL_#", 
+                "CLIENT_NCR_#", 
+                "NCR_STATUS", 
+                "BOL_FLAG", 
+                "FREIGHT_BILL_FLAG", 
+                "INVOICE_FLAG", 
+                "POD_DOC_FLAG", 
+                "RCV_DOC_FLAG", 
+                "INSP_REP_FLAG", 
+                "OTHER_DOC_FLAG", 
+                "CLAIM_JUSTIFIED", 
+                "NCR_CREATE_USER", 
+                "NCR_CURRENCY", 
+                "CARRIER_CLAIM_#", 
+                    //"CLAIM_CLOSED_DATE", DPT
+                TO_CHAR("CLAIM_CLOSED_DATE",'YYYY-MM-DD') AS "CLAIM_CLOSED_DATE",
+                    //"CLAIM_FILED_DATE", DPT
+                TO_CHAR("CLAIM_FILED_DATE",'YYYY-MM-DD') AS "CLAIM_FILED_DATE",
+                    //"NCR_DUE_DATE", DPT
+                TO_CHAR("NCR_DUE_DATE",'YYYY-MM-DD') AS "NCR_DUE_DATE",
+                    //"SHIP_DATE", DPT
+                TO_CHAR("SHIP_DATE",'YYYY-MM-DD') AS "SHIP_DATE",
+                    //"DELIVERY_DATE", DPT
+                TO_CHAR("DELIVERY_DATE",'YYYY-MM-DD') AS "DELIVERY_DATE",
+                "CLAIM_AGAINST_ADDR1", 
+                "NCR_AUTO_CREATE_FLAG", 
+                    //"NCR_CREATE_DATE", DPT
+                TO_CHAR("NCR_CREATE_DATE",'YYYY-MM-DD') AS "NCR_CREATE_DATE",
+                    //"NCR_CLOSED_DATE", DPT
+                TO_CHAR("NCR_CLOSED_DATE",'YYYY-MM-DD') AS "NCR_CLOSED_DATE",
+                    "SERVICE_FAILURE_CODE", 
+                "PRO_NO", 
+                "RESPONSE_DUE_DATE", 	//Not a date field
+                "ACTUAL_RESPONSE_DATE", //Not a date field
+                "CONTAINER/PKG TYPE 1", 
+                "CONTAINER/PKG TYPE 2", 
+                "PRODUCT_RELEASE_DETERMINED", 
+                "CLIENT_SPECIFIC_APP", 
+                "TERMINAL_CODE", 
+                "NCR_DESIGNATION", 
+                "TONU_FEE_AMOUNT", 
+                "CLM_USER12", 
+                "CLM_USER13", 
+                "CLM_USER14", 
+                "CLM_USER15", 
+                "CLM_USER16", 
+                "CLM_USER17", 
+                "CLM_USER18", 
+                "CLM_USER19", 
+                "CLM_USER20", 
+                "OTI_FLAG", 
+                "UN_NA_NO", 
+                "TRAILER_CONTAINER_NO", 
+                "PRODUCT_NAME", 
+                "HAZARDOUS_MATERIAL", 
+                "NEAR_MISS", 
+                "INJURY_FATALITY", 
+                "ODYSSEY_ORIGINATOR", 
+                "ORIGINATOR", 
+                "INVESTIGATION_FACTS", 
+                "ACTION_PLAN", 
+                "ROOT_CAUSE_LONG", 
+                "SERVICE_FAILURE_DETAILS", 
+                "CONSIGNEE_NAME", 
+                "CORRECTIVE_ACTION_SHORT", 
+                "ROOT_CAUSE_SHORT", 
+                "NCR_RESPONSIBLE_PARTY", 
+                "STATUS", 
+                "TOTAL_CLAIM_AMOUNT", 
+                "TOTAL_CLAIM_QUANTITY", 
+                "VEHICULAR_ACCIDENT_PROD_DETAIL", 
+                "VEHICULAR_ACCIDENT_PROP_DETAIL", 
+                "VEHICULAR_ACCIDENT_TYPE", 
+                "CONTAMINATION", 
+                "SAFETY_VIOLATION_EQUIP_FAILURE", 
+                "HAZARDOUS_CLASS", 
+                "SECURITY_LADING_SECURITY", 
+                "SECURITY_PAPER_INSP_PLACARDS", 
+                "SAFETY_LACK_OF_PPE", 
+                "SAFETY_NCR_DOT_DETAIL", 
+                "SAFETY_SITE_REG_FAILURE", 
+                "CLAIM_ORIGINATOR_DESCR", 
+                "OT_NEAR_MISS_DESCR", 
+                "OT_NON_NEAR_MISS_DESCR", 
+                "TOTAL_REIMBURSED_AMOUNT", 
+                "CLAIM_ACTIVITY", 
+                    //"CLAIM_LAST_TOUCHED_DATE", DPT
+                TO_CHAR("CLAIM_LAST_TOUCHED_DATE",'YYYY-MM-DD') AS "CLAIM_LAST_TOUCHED_DATE",
+                "CLAIM_ITEM_DATA", 
+                "ASSIGNED_INVESTIGATOR", 
+                "SERVICE_FAILURE_DESCRIPTION", 
+                "TOTAL_DECLINED_AMOUNT", 
+                "PAST_DUE_STATUS", 
+                "ENTRY_LAG_BUCKET", 
+                "AGE_BUCKET", 
+                "TOTAL_DAYS_NCR_OPEN", 
+                "WORKDAYS_NCR_OPEN", 
+                "KPI_DAYS_NCR_OPEN", 
+                "CLAIM_FLAG", 
+                "CLAIM_STATUS_FLAG", 
+                "NCR_SF_CATEGORY", 
+                "SAFETY_ROLL_UP", 
+                "UNIQUE_ACCIDENT", 
+                "ROOT_CAUSE_CATEGORY", 
+                "EMEA_CATEGORY", 
+                "EMEA_POINTS", 
+                "EMEA_SAFETY_ISSUE", 
+                "NCR_DAYS_UNTIL_DUE", 
+                "NCR_DAYS_UNTIL_DUE_BUCKET", 
+                "CLAIM_DAYS_OPEN", 
+                "CLAIM_WORKDAYS_OPEN", 
+                "CLAIM_OPEN_DAYS_BUCKET", 
+                "CLAIM_LAG_DAYS", 
+                "NCR_TOTAL_DAYS_CYCLED", 
+                "OTI_NM_BASIC_CATEGORY", 
+                "OTI_COUNTER", 
+                "OD_PAIR", 
+                "CLAIM_AMOUNT_FILED_CATEGORY", 
+                "DATE_CUTOFF_CLM" //DateTime
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB; 
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    //*************************NN_PRESENTED_FRT_CHRG_USD****************************
+        SUB NN_PRESENTED_FRT_CHRG_USD(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "NN_FRT_INV_CHARGE_ID", 
+                "NN_FRT_INV_ID", 
+                "BNFI_INVOICE_ID", 
+                "BNFI_ID", 
+                "BNFI_BOLID", 
+                "NN_SHIPMENT_ID", 
+                "NNIFC_CURRENCY", 
+                "NN_CURRENT_AUDIT_STATUS", 
+                "BNFI_CREATE_DATE", 
+                "USD_TO_EUR_EXCH_RATE", 
+                "BNFI_AMOUNT_USD", 
+                "USD_TO_FI_EXCH_RATE", 
+                "BNFIC_CHARGETYPE", 
+                "BNFIC_AMOUNT", 
+                "BNFIC_AMOUNT_CURRENCY", 
+                "BNFIC_DESCRIPTION", 
+                "BNFIC_AMOUNT_USD", 
+                "BASE_RATE_METHOD", 
+                "ACTUAL_PROCESSED_CURRENCY", 
+                "ACCRUAL_CURRENCY", 
+                "ACTUAL_PROCESSED_AMOUNT_USD", 
+                "BNFI_FREIGHTESTAMOUNT_USD", 
+                "BNFI_TOTALCHARGEAMOUNT_USD", 
+                "USD_TO_ACCRUAL_EXCH_RATE", 
+                "FREIGHT_CLASS", 
+                "DATE_CUTOFF_NNIFC_USD" 
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    //*************************NN_FREIGHT_INVOICE_INFO******************************
+        SUB NN_INVOICE_TRACKING(pOwner,pTableName,pDateField)
+            // the Name of the Sub 
+            // should be the same 
+            // as pTableName for 
+            // ease of use
+
+
+            [$(pTableName)]:
+            SELECT 
+                "QRY_BLCK", 
+                "NN_INV_TRACK_ID", 
+                "BNFI_ORGID", 
+                "BNFI_BOLID", 
+                "BNFI_ID", 
+                "BNFI_INVOICE_ID", 
+                "NN_SHIPMENT_ID", 
+                "BE_DOCID", 
+                "CLIENT_INVOICE_ID", 
+                "AP_RECORD_ID", 
+                "APID", 
+                "NN_TMS_FBT_ID", 
+                "BNFI_BOLNUMBER", 
+                "BNFI_VAT_NUMBER", 
+                "BNFI_PURCHASE_ORDER", 
+                "BNFI_CARRIER_INVOICE", 
+                "BNFI_PRO_NO", 
+                "BNFI_CARRIER_BOL_NO", 
+                "BE_REFNUMBER", 
+                "BEX_V_INV_NO", 
+                "BEX_ODYSSEYREFNUMBER", 
+                "BEX_SHIPMENT_REF_NUMBER", 
+                "BEX_FREIGHT_INVOICE_REF_NUMBER", 
+                "BATCHNUMBER", 
+                "CLIENT_INVOICE", 
+                "PAYMENT_REF_NO", 
+                "CLIENT_PO_NO", 
+                "GP_CHECK_NO", 
+                "CHECK_NO", 
+                "REFNO", 
+                "VATNUMBER", 
+                "BOL_NO_NNA", 
+                "BNFI_AUDIT_SYSTEM", 
+                "BNFI_NN_CLIENT", 
+                "TMS_OWNING_ORG", 
+                "BNFI_SCAC", 
+                "BNFI_CARRIER_NAME", 
+                "BNFI_SHIP_MODE", 
+                "BNFI_EQUIPMENT_TYPE", 
+                "BNFI_SHIP_DIR", 
+                "BNFI_INVOICE_DATE", 
+                "BNFI_INVOICE_RECV_DATE", 
+                "BNFI_CARRIER_SHIP_DATE", 
+                "BNFI_SHIP_DATE", 
+                "PAYMENTTERMSCODE", 
+                "BNFI_AUDIT_DONE_DATE", 
+                "BNFI_PAYMENT_DUE_DATE", 
+                "BNFI_CURRENT_AUDIT_STATUS", 
+                "BNFI_ERROR_REASON", 
+                "BNFI_DAYS_TO_ENTER", 
+                "BNFI_DAYS_TO_PROCESS", 
+                "BNFI_RATE_TYPE", 
+                "BNFI_HAZARD", 
+                "BNFI_AMOUNT", 
+                "BNFI_CURRENCY", 
+                "BNFI_AMOUNT_USD", 
+                "ACTUAL_PROCESSED_AMOUNT", 
+                "BNFI_BILLED_WEIGHT_LBS", 
+                "BNFI_BILLED_WEIGHT_KGS", 
+                "BNFI_BILLED_WEIGHT", 
+                "BNFI_BILLED_UOM_WEIGHT", 
+                "BNFI_ACTUAL_WEIGHT", 
+                "BNFI_ACTUAL_UOM_WEIGHT", 
+                "BNFI_PACKAGECOUNT", 
+                "BNFI_ENTRY_METHOD", 
+                "BNFI_CREATE_DTSTMP", 
+                "BNFI_CREATE_DATE", 
+                "BNFI_UPDATE_DATE", 
+                "BNFI_SHIP_FROM_NAME", 
+                "FI_ORIGIN_ADDR1", 
+                "FI_ORIGIN_ADDR2", 
+                "ORIGIN_ZIP", 
+                "ORIGIN_CITY", 
+                "ORIGIN_STATE", 
+                "ORIGIN_COUNTRY", 
+                "BNFI_SHIP_TO_NAME", 
+                "FI_DEST_ADDR1", 
+                "FI_DEST_ADDR2", 
+                "DEST_ZIP", 
+                "DEST_CITY", 
+                "DEST_STATE", 
+                "DEST_COUNTRY", 
+                "BNFI_DISTANCE", 
+                "BNFI_UOM_DISTANCE", 
+                "BNFI_PORT_OF_LOADING", 
+                "BNFI_PORT_OF_UNLOADING", 
+                "EVER_ON_CRS_HOLD", 
+                "CRS_ISSUE_COUNT", 
+                "FIRST_CRS_OPEN_DATE", 
+                "LAST_CRS_RESOLVED_DATE", 
+                "DAYS_CRS_ISSUE_OPEN", 
+                "CRS_RESOLUTION", 
+                "UX1_VALUE", 
+                "UX2_VALUE", 
+                "UX3_VALUE", 
+                "UX4_VALUE", 
+                "UX5_VALUE", 
+                "UX6_VALUE", 
+                "UX7_VALUE", 
+                "UX8_VALUE", 
+                "UX9_VALUE", 
+                "UX10_VALUE", 
+                "UX11_VALUE", 
+                "UX12_VALUE", 
+                "UX13_VALUE", 
+                "UX14_VALUE", 
+                "UX15_VALUE", 
+                "UX16_VALUE", 
+                "UX17_VALUE", 
+                "UX18_VALUE", 
+                "UX19_VALUE", 
+                "UX20_VALUE", 
+                "INTERNAL_BOL_FLAG", 
+                "BNFI_CHARGE_CURRENCY", 
+                "BNFI_TOTAL_CHARGE_USD", 
+                "NET_BASE_INV_AMOUNT_USD", 
+                "FUEL_SURCHARGE_INV_USD", 
+                "STOPOFF_INV_USD", 
+                "GOODS_AND_SERVICES_TAX_INV", 
+                "PROVINCIAL_SALES_TAX_INV", 
+                "FRT_ESTIMATE_STATUS", 
+                "FREIGHTESTAMOUNT", 
+                "BNFI_TOTAL_CHARGE", 
+                "OTHER_CHARGE_INV_USD", 
+                "BILL_WT_LBS", 
+                "NN_INTERNAL_BOL_FLAG", 
+                "TMS_INTERNAL_BOL_FLAG", 
+                "PGI_DATE", 
+                "NN_RATED_NET_BASE_USD", 
+                "NN_RATED_FUEL_SURCHARGE_USD", 
+                "NN_RATED_CLEANING_CHARGE_USD", 
+                "NN_RATED_VAT_CHARGE_USD", 
+                "NN_RATED_STOPOFF_CHARGE_USD", 
+                "NN_RATED_TOTAL_USD", 
+                "TMS_RATED_NET_BASE_USD", 
+                "TMS_RATED_FUEL_SURCHARGE_USD", 
+                "TMS_RATED_OTHER_USD", 
+                "TMS_RATED_TOTAL_USD", 
+                "CATEGORY", 
+                "BE_EVENTTYPE_NAME", 
+                "BE_STATUS", 
+                "BE_TOTAL_AR_AMOUNT", 
+                "BE_TOTAL_AR_AMOUNT_CURRENCY", 
+                "RATINGSTATUS", 
+                "BILLINGSTATUS", 
+                "BEX_VENDOR_INV_TYPE", 
+                "BEX_V_INV_DATE", 
+                "BEX_PAYMENT_TERMS", 
+                "BEX_PAY_DATE_TYPE", 
+                "BEX_BILLING_EVENTTYPE_NAME", 
+                "BEX_MANUAL_BILLING", 
+                "BEX_AUTHOR", 
+                "SOURCE_ID", 
+                "APR_AMOUNT", 
+                "APR_CURRENCY", 
+                "AP_AMOUNT_USD", 
+                "BUSINESS_MODEL", 
+                "NETINVOICEAMOUNT", 
+                "NETINVOICE_CURRENCY", 
+                "NETINVOICEAMOUNT_USD", 
+                "BILLING_INVOICE_ENTER_DATE", 
+                "BILLING_INVOICE_STATUS", 
+                "GL_CODED", 
+                "GL_CODED_DTSTMP", 
+                "MANAGEMENT_FEE", 
+                "MANAGEMENT_FEE_B", 
+                "LAST_AP_CREATE_DATE", 
+                "CLIENT_AP_AMOUNT_USD", 
+                "LAST_CLIENT_FUNDING_DATE", 
+                "CLIENT_AR_AMOUNT_USD", 
+                "CLIENT_FUNDING_STATUS", 
+                "ALLOCATEDAMOUNT", 
+                "NETWORK_LEVERAGE_MARKUP", 
+                "BEL_CURRENCY", 
+                "ALLOCATED_AMOUNT_USD", 
+                "NETWORK_LEVERAGE_MARKUP_USD", 
+                "CLIENT_INVOICE_STATE", 
+                "FREIGHT_TERMS", 
+                "PARTNER_NO", 
+                "BUS_UNIT", 
+                "SALES_ORG", 
+                "CLIENT_INVOICE_DOC_TYPE", 
+                "BATCHSENTDATE", 
+                "CLIENT_INVOICE_SENT_DATE", 
+                "CLIENT_INVOICE_TYPE", 
+                "BOI_CREATE_DATE", 
+                "LAST_BOI_UPDATE_DATE", 
+                "CLIENT_PAYMENT_DUE_DATE", 
+                "DAYS_LEFT_TO_FUND", 
+                "AGEING_STATUS", 
+                "AGEING_DATE", 
+                "GP_CHECK_DATE", 
+                "GP_TOTAL_CHECK_AMOUNT", 
+                "GP_CHECK_CURRENCY", 
+                "LAST_CHECK_DATE", 
+                "APPLIED_AMT_SUM_USD", 
+                "REALIZED_GAIN_LOSS", 
+                "APPLIED_AMOUNT_SUM", 
+                "APPLIED_CURRENCY", 
+                "NET_CONV_FACTOR", 
+                "GP_DOC_TYPE", 
+                "APR_RELEASE_DATE", 
+                "APR_PAYMENT_DUE_DATE", 
+                "APR_INTEGR_TYPE", 
+                "APR_STATE", 
+                "ODYSSEY_SUBSIDIARY", 
+                "GP_SUBSIDIARY", 
+                "CARRIER_VAT", 
+                "CARRIER_VAT_UNIT", 
+                "ODYSSEY_VAT", 
+                "ODYSSEY_VAT_UNIT", 
+                "APR_TRX_COUNT", 
+                "BEL_TRX_COUNT", 
+                "BOI_TRX_COUNT", 
+                "NN_CLIENT", 
+                "MANUAL_INVOICE_FLAG", 
+                "CREDIT_FLAG", 
+                "DAYS_PAST_DUE", 
+                "NN_RATED_OTHER_USD", 
+                "DATE_CUTOFF_INV_TRACK" 
+            FROM "$(pOwner)"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+
+
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+//*****************************************************************************************
+//-----------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------------------
+//**************************************CREATE QVD*****************************************
+    SUB CreateQvd(pTableName)
+
+
+        LET vMaxYear = Year(Today()); 	                // Current year
+        IF '$(pTableName)'='NN_INVOICE_TRACKING' THEN
+            LET vMinYear = (vMaxYear-$(HistoryYears))+2;
+        ELSE 		// Should not exceed max historical extract ever performed
+            LET vMinYear = vMaxYear-$(HistoryYears);
+        END IF;
+
+        DO WHILE vMinYear <= vMaxYear
+            Trace $(vMinYear);
+            
+            [$(pTableName)]:
+            LOAD *
+            FROM 
+                [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vMinYear)*.qvd](qvd);
+
+            LET vMinYear = vMinYear +1;        
+        LOOP;
+
+        STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\$(pTableName).qvd';
+
+        DROP TABLE [$(pTableName)];
+
+    END SUB;
+//-----------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------------------
+//**************************************UPDATE QVD*****************************************
+    SUB UpdateQvds(pTableName,pCreateDateField,pPrimaryKey)
+
+        LET vMinYear = vMaxYear-$(HistoryYears);		// Should not exceed max historical extract ever performed
+
+        //Creating a list for all monthly qvd files to be updated
+        QvdList:
+        Load
+            DISTINCT
+            Year($(pCreateDateField)) &	Num(Month($(pCreateDateField)),00)	AS YearMonth
+        Resident
+            $(pTableName)
+        Where     
+            Year($(pCreateDateField)) >= $(vMinYear);
+
+        For i = 0 to NoOfRows('QvdList')-1
+            LET vYearMonth = Peek('YearMonth',i,'QvdList');
+
+            TRACE ;
+            TRACE Updating monthly Qvd $(vYearMonth);
+
+            NoConcatenate
+            Updated:
+            Load
+                *
+            Resident
+                $(pTableName)
+            Where
+                Year($(pCreateDateField)) &	Num(Month($(pCreateDateField)),00) = $(vYearMonth);
+
+            IF not IsNull(QvdTableName('[lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd]')) THEN
+            
+                CONCATENATE(Updated)
+                Stored:
+                LOAD
+                    *
+                From
+                    [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth)*.qvd](qvd)
+                Where 
+                    Not Exists($(pPrimaryKey),$(pPrimaryKey));
+            ENDIF
+
+            STORE Updated INTO [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd];    
+            DROP TABLE Updated;
+
+        Next
+
+        DROP TABLE QvdList;
+        DROP TABLE $(pTableName);
+
+    END SUB;
+//-----------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------------------
+//************************************DIMENSIONS*******************************************
+    SUB Dimensions
+
+        //******************************************************************************
+        // 	Name:			Dimensions	
+        // 	Description: 	Loads all dimensions to be used on the data model
+        //******************************************************************************
+        LIB CONNECT TO 'DW_DB';
+        [DIM_CARRIER]:
+        SELECT "DIM_ID", 
+            "TMS_SCAC_ID", 
+            "CARRIER_STATUS", 
+            "TMS_CARRIER_NAME", 
+            "TMS_CARRIER_LONG_NAME", 
+            "CARRIER_VENDOR_NO", 
+            "CARRIER_SHIP_CLASS", 
+            "CARRIER_SC_CLASS_ID", 
+            "CARRIER_PAYMENT_METHOD", 
+            "TMS_PAYMENT_TERMS", 
+            "CARR_CUR_PAYMENT_CODE", 
+            "CARRIER_PAYMENT_TOLERANCE", 
+            "CARR_CD_PENDING_STATUS_FLAG", 
+            "CARR_CERTIFIED_FLAG", 
+            "CARR_CONTRACT_CARRIER_FLAG", 
+            "CARR_FAK_FLAG", 
+            "CARR_FINAL_PLAN_FLAG", 
+            "CARR_GENERATE_PRO_NO_FLAG", 
+            "CARR_HAZ_MAT_FLAG", 
+            "CARR_PERFORM_MEASURE_FLAG", 
+            "NN_SCAC", 
+            "NN_CARRIER_NAME", 
+            "GP_SCAC", 
+            "CARRIER_TYPE", 
+            "DATE_CUTOFF" 
+        FROM "REPORTDB"."DIM_CARRIER";
+
+        store [DIM_CARRIER] into 'lib://Qlik Network Folders\1_Source_QVD\DW\DIM_CARRIER.qvd';
+
+        drop table DIM_CARRIER;
+
+        [DIM_CLIENT_NN]:
+        SELECT "DIM_ID", 
+            "NN_ORG_ID", 
+            "NN_ORG_NAME", 
+            "NN_ORG_TYPE", 
+            "NN_TMS_CLIENT_MATCH", 
+            "NN_OPS_CLIENT_NAME", 
+            "DATE_CUTOFF" 
+        FROM "REPORTDB"."DIM_CLIENT_NN";
+
+        store [DIM_CLIENT_NN] into 'lib://Qlik Network Folders\1_Source_QVD\DW\DIM_CLIENT_NN.qvd';
+
+        drop table DIM_CLIENT_NN;
+
+        [DIM_CLIENT_TMS]:
+        SELECT "DIM_ID", 
+            "TMS_OWNING_ORG", 
+            "TMS_ORG_TYPE", 
+            "TMS_CLIENT_MATCH", 
+            "OPS_CLIENT_NAME", 
+        // 	"OLT_CLIENT_CENTER", 
+        // 	"PLAN_CTR", 
+        // 	"PLAN_CTR_TMZ", 
+            "NN_ORG_ID", 
+            "DATE_CUTOFF" 
+        FROM "REPORTDB"."DIM_CLIENT_TMS";
+
+        store [DIM_CLIENT_TMS] into 'lib://Qlik Network Folders\1_Source_QVD\DW\DIM_CLIENT_TMS.qvd';
+
+        drop table DIM_CLIENT_TMS;
+
+        [DIM_DEST_LOC]:
+        SELECT "DIM_ID", 
+            "DEST_LOC_ID", 
+            "DEST_LOC_STATUS", 
+            "DEST_LOCATION_TYPE", 
+            "DEST_GEOGRAPHY", 
+            "DEST_COUNTRY", 
+            "DEST_US_REGION", 
+            "DEST_US_GULF_COAST", 
+            "DEST_DISTRICT", 
+            "DEST_STATE", 
+            "DEST_CITY", 
+            "DEST_ZIP", 
+            "DEST_STATE_DISTRICT", 
+            "DEST_CITY_STATE", 
+            "DEST_CITY_STATE_ZIP", 
+            "DEST_LOC_TIME_ZONE", 
+            "DEST_JTIMEZONE_TZNAME", 
+            "DEST_LOC_LANGUAGE_CODE", 
+            "DATE_CUTOFF" 
+        FROM "REPORTDB"."DIM_DEST_LOC";
+
+        store [DIM_DEST_LOC] into 'lib://Qlik Network Folders\1_Source_QVD\DW\DIM_DEST_LOC.qvd';
+
+        drop table DIM_DEST_LOC;
+
+        [DIM_DEST_ORG]:
+        SELECT "DIM_ID", 
+            "DEST_ORG_ID", 
+            "DEST_ORG_STATUS", 
+            "DEST_ORG_SYS_OF_RECORD", 
+            "DEST_ORG_PARENT_ORG_ID", 
+            "DEST_ORG_FAC_CODE", 
+            "DEST_ORG_TYPE", 
+            "DEST_ORG_SHIP_LOC_TYPE", 
+            "DEST_ORG_SHORT_NAME", 
+            "DEST_ORG_LONG_NAME", 
+            "DEST_ORG_TIME_ZONE", 
+            "DATE_CUTOFF" 
+        FROM "REPORTDB"."DIM_DEST_ORG";
+
+        store [DIM_DEST_ORG] into 'lib://Qlik Network Folders\1_Source_QVD\DW\DIM_DEST_ORG.qvd';
+
+        drop table DIM_DEST_ORG;
+
+        [DIM_EQUIPMENT]:
+        SELECT "DIM_ID", 
+            "METHOD", 
+            "QUALITY_METHOD", 
+            "OPS_METHOD", 
+            "EQUIP_CODE", 
+            "EQUIP_TYPE", 
+            "EQUIP_ID", 
+            "REPORT_EQUIP_ID", 
+            "EQUIP_DESC_SHORT", 
+            "EQUIP_DESC_LONG", 
+            "EQUIP_MAX_WEIGHT", 
+            "EQUIP_UOM_WEIGHT", 
+            "DATE_CUTOFF", 
+            "OLD_METHOD" 
+        FROM "REPORTDB"."DIM_EQUIPMENT";
+
+        store [DIM_EQUIPMENT] into 'lib://Qlik Network Folders\1_Source_QVD\DW\DIM_EQUIPMENT.qvd';
+
+        drop table DIM_EQUIPMENT;
+
+        [DIM_ORIGIN_LOC]:
+        SELECT "DIM_ID", 
+            "ORIGIN_LOC_ID", 
+            "ORIGIN_LOC_STATUS", 
+            "ORIGIN_LOCATION_TYPE", 
+            "ORIGIN_GEOGRAPHY", 
+            "ORIGIN_COUNTRY", 
+            "ORIGIN_US_REGION", 
+            "ORIGIN_US_GULF_COAST", 
+            "ORIGIN_DISTRICT", 
+            "ORIGIN_STATE", 
+            "ORIGIN_CITY", 
+            "ORIGIN_ZIP", 
+            "ORIGIN_STATE_DISTRICT", 
+            "ORIGIN_CITY_STATE", 
+            "ORIGIN_CITY_STATE_ZIP", 
+            "ORIGIN_LOC_TIME_ZONE", 
+            "ORIGIN_JTIMEZONE_TZNAME", 
+            "ORIGIN_LOC_LANGUAGE_CODE", 
+            "DATE_CUTOFF" 
+        FROM "REPORTDB"."DIM_ORIGIN_LOC";
+
+        store [DIM_ORIGIN_LOC] into 'lib://Qlik Network Folders\1_Source_QVD\DW\DIM_ORIGIN_LOC.qvd';
+
+        drop table DIM_ORIGIN_LOC;
+
+        [DIM_ORIGIN_ORG]:
+        SELECT "DIM_ID", 
+            "ORIGIN_ORG_ID", 
+            "ORIGIN_ORG_STATUS", 
+            "ORIGIN_ORG_SYS_OF_RECORD", 
+            "ORIGIN_ORG_PARENT_ORG_ID", 
+            "ORIGIN_ORG_FAC_CODE", 
+            "ORIGIN_ORG_TYPE", 
+            "ORIGIN_ORG_SHIP_LOC_TYPE", 
+            "ORIGIN_ORG_SHORT_NAME", 
+            "ORIGIN_ORG_LONG_NAME", 
+            "ORIGIN_ORG_TIME_ZONE", 
+            "DATE_CUTOFF" 
+        FROM "REPORTDB"."DIM_ORIGIN_ORG";
+
+        store [DIM_ORIGIN_ORG] into 'lib://Qlik Network Folders\1_Source_QVD\DW\DIM_ORIGIN_ORG.qvd';
+
+        drop table DIM_ORIGIN_ORG;
+
+    END SUB
+//-----------------------------------------------------------------------------------------
+
+
+//-----------------------------------------------------------------------------------------
+//*************************************CALL STATEMENTS*************************************
+
+    IF vReloadType = 1 THEN
+        CALL getHistory;
+    ELSE
+        CALL getUpdated;
+    ENDIF
+
+    Call Dimensions;
+
+    //-----------------------------------------------------------------
+    //Create one Qvd for table only with x years back and current year
+    //*****************************************************************
+    // CALL CreateQvd('TableName');
+    // Need one for EACH table that is being extracted in the app
+    //*****************************************************************
+        CALL CreateQvd('LOAD_PLANNING_SHIPMENTS');
+        CALL CreateQvd('NN_FREIGHT_CHARGE_USD');
+        CALL CreateQvd('NN_SHIPMENT_INFO');
+        CALL CreateQvd('NN_FREIGHT_INVOICE_INFO');
+       // CALL CreateQvd('CLAIMS_AND_COMPLAINTS');
+        CALL CreateQvd('ORDER_CREATE_MAX');
+        CALL CreateQvd('NN_PRESENTED_FRT_CHRG_USD');
+        CALL CreateQvd('NN_INVOICE_TRACKING');
+        //repeats go here//
+    //*****************************************************************
+//-----------------------------------------------------------------------------------------
+
