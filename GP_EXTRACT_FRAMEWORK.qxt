@@ -23,9 +23,6 @@ SET LongDayNames='Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
 //     $(Must_Include='lib://Qlik Network Folders\Application Scripts\Extract\DataWarehouse.qxt');
 //*************************************************************************************************
 
-//--------ADD DATA CONNECTION HERE---------------
-LIB CONNECT TO 'DW_DB';
-
 // Setting to reload data in full or just partial
 
 //LET vReloadType = 0;  // uncomment this to force a specific reload type 
@@ -159,14 +156,12 @@ let HistoryYears= 3;
 
     //***************************LOAD_PLANNING_SHIPMENTS*****************************
         SUB TABLE_NAME(pOwner,pTableName,pDateField)
-            // the Name of the Sub 
-            // should be the same 
-            // as pTableName for 
-            // ease of use
 
+        LIB CONNECT TO '$(connection)';
 
             [$(pTableName)]:
-            SELECT 
+            SELECT
+                '$(busunit)' 
                 "PRIMARY_KEY",
                 "KEY_DATE",
                 "KEY_UPDATE_DATE",
@@ -181,7 +176,7 @@ let HistoryYears= 3;
 
 
             IF vReloadType = 1 THEN
-                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd';
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth).qvd';
                 DROP TABLE [$(pTableName)];
             ENDIF
 
@@ -195,13 +190,8 @@ let HistoryYears= 3;
 //**************************************CREATE QVD*****************************************
     SUB CreateQvd(pTableName)
 
-
         LET vMaxYear = Year(Today()); 	                // Current year
-        IF '$(pTableName)'='NN_INVOICE_TRACKING' THEN
-            LET vMinYear = (vMaxYear-$(HistoryYears))+2;
-        ELSE 		// Should not exceed max historical extract ever performed
-            LET vMinYear = vMaxYear-$(HistoryYears);
-        END IF;
+        LET vMinYear = vMaxYear-$(HistoryYears);
 
         DO WHILE vMinYear <= vMaxYear
             Trace $(vMinYear);
@@ -209,12 +199,12 @@ let HistoryYears= 3;
             [$(pTableName)]:
             LOAD *
             FROM 
-                [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vMinYear)*.qvd](qvd);
+                [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vMinYear)*.qvd](qvd);
 
             LET vMinYear = vMinYear +1;        
         LOOP;
 
-        STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\$(pTableName).qvd';
+        STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\$(pTableName)_$(busunit).qvd';
 
         DROP TABLE [$(pTableName)];
 
@@ -252,19 +242,19 @@ let HistoryYears= 3;
             Where
                 Year($(pCreateDateField)) &	Num(Month($(pCreateDateField)),00) = $(vYearMonth);
 
-            IF not IsNull(QvdTableName('[lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd]')) THEN
+            IF not IsNull(QvdTableName('[lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth).qvd]')) THEN
             
                 CONCATENATE(Updated)
                 Stored:
                 LOAD
                     *
                 From
-                    [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth)*.qvd](qvd)
+                    [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth)*.qvd](qvd)
                 Where 
                     Not Exists($(pPrimaryKey),$(pPrimaryKey));
             ENDIF
 
-            STORE Updated INTO [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(vYearMonth).qvd];    
+            STORE Updated INTO [lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth).qvd];    
             DROP TABLE Updated;
 
         Next
@@ -279,7 +269,7 @@ let HistoryYears= 3;
 
 //-----------------------------------------------------------------------------------------
 //*************************************CALL STATEMENTS*************************************
-
+Sub GP_BU_Extract(connection,busunit)
     IF vReloadType = 1 THEN
         CALL getHistory;
     ELSE
@@ -297,5 +287,8 @@ let HistoryYears= 3;
         CALL CreateQvd('TABLE_NAME');
         //repeats go here//
     //*****************************************************************
+End Sub;
 //-----------------------------------------------------------------------------------------
 
+Call GP_BU_Extract('dataconnectionname','businessunitcode');
+//add repeats for additional BU extractions
