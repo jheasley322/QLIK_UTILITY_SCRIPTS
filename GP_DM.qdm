@@ -1,0 +1,93 @@
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$#,##0.00;-$#,##0.00';
+SET TimeFormat='h:mm:ss TT';
+SET DateFormat='M/D/YYYY';
+SET TimestampFormat='M/D/YYYY h:mm:ss[.fff] TT';
+SET FirstWeekDay=6;
+SET BrokenWeeks=1;
+SET ReferenceDay=0;
+SET FirstMonthOfYear=1;
+SET CollationLocale='en-US';
+SET CreateSearchIndexOnReload=1;
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET LongMonthNames='January;February;March;April;May;June;July;August;September;October;November;December';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+SET LongDayNames='Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
+SET NumericalAbbreviation='3:k;6:M;9:G;12:T;15:P;18:E;21:Z;24:Y;-3:m;-6:μ;-9:n;-12:p;-15:f;-18:a;-21:z;-24:y';
+
+Let vStart = yearstart(addyears(today(),-2));
+Let vEnd = MonthEnd(today());
+
+Sub DataModel(busunit)
+  Sub Payments
+    LOAD
+        "Odyssey BU",
+        "Voucher Number",
+        __vendor_id,
+        "Document Date",
+        "Document Number",
+        "Functional Amount",
+        "Transaction Source",
+        "Posting User",
+        "Modify User",
+        "Currency ID",
+        "GL Posting Date",
+        "Payment Type",
+        "Checkbook ID",
+        Cardname,
+        1 as __doc_counter
+    FROM [lib://Qlik Network Folders/GP/2_Transform_QVD/Payments_$(busunit).qvd](qvd);
+  End Sub;
+
+  Sub Vendors
+    LOAD
+        "Odyssey BU (vendors)",
+        __vendor_id,
+        "Vendor Name",
+        "Vendor Check Name",
+        "Vendor Short Name",
+        1 as __vend_counter
+    FROM [lib://Qlik Network Folders/GP/2_Transform_QVD/Vendors_$(busunit).qvd](qvd)
+    where exists([__vendor_id]);
+  End Sub;
+  
+  Call Payments;
+  Call Vendors;
+  
+End Sub;
+
+Sub MasterCal(FieldName,CalStart,CalEnd)
+
+    ['$(FieldName)_Calendar']:
+    LOAD
+        "Date" as "$(FieldName)",
+        DateText as "$(FieldName).DateText",
+		"Year" as "$(FieldName).Year",
+        Quarter as "$(FieldName).Quarter",
+        "Month" as "$(FieldName).Month",
+        MonthSerial as "$(FieldName).MonthSerial",
+        "Week" as "$(FieldName).Week",
+        DaySerial as "$(FieldName).DaySerial",
+        WeekDay(Date) as "$(FieldName).DayOfWeek",
+        Year&'-'&Quarter as "$(FieldName).YearQuarter",    
+        YearMonth as "$(FieldName).YearMonth",
+        MonthName(Date) as "$(FieldName).YearMonthName",
+        Year(Date)&'-'&Num(Week(Date),'00') as "$(FieldName).YearWeek",
+        WeekStart(Date) as "$(FieldName).WeekStart",
+		WeekEnd(Date, 0, 5) as "$(FieldName).WeekFriday",
+        if(Match(Weekday(Date),5,6,'Sat','Sun'),0,1) as "$(FieldName).WKDYFLAG",
+        EOQFLAG as "$(FieldName).EOQFLAG",
+        EOMFLAG as "$(FieldName).EOMFLAG"        
+    FROM [lib://Qlik Network Folders/1_Source_QVD/Calendar/2013-2025Cal.qvd](qvd)
+    Where Date>='$(CalStart)' AND Date <='$(CalEnd)';
+
+End Sub;
+
+
+Call DataModel('OLBT');
+Call DataModel('CO');
+Call MasterCal('GL Posting Date','$(vStart)','$(vEnd)');
+Call MasterCal('Document Date','$(vStart)','$(vEnd)');

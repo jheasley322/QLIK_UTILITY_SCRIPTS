@@ -58,6 +58,10 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
             // CALL CreateQvd('TableName')
             CALL CreateQvd('PM20000');
             CALL CreateQvd('PM30200');
+            CALL CreateQvd('GL10000');
+            CALL CreateQvd('GL20000');
+            CALL CreateQvd('GL30000');
+
             //repeats go here//
         //*****************************************************************
     End Sub;
@@ -111,7 +115,11 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
             // example       'reportdb','bnfi_invoice','create_date' 
             
             Call PM20000 ('$(busunit)','PM20000','DOCDATE');  
-            Call PM20000 ('$(busunit)','PM30200','DOCDATE');   
+            Call PM30200 ('$(busunit)','PM30200','DOCDATE'); 
+
+            Call GL10000 ('$(busunit)','GL10000','DOCDATE');
+            Call GL20000 ('$(busunit)','GL20000','DOCDATE');
+            Call GL30000 ('$(busunit)','GL30000','DOCDATE');  
         	
             //Setting variables for next step
             LET vMinDate 	= vMaxDate;
@@ -148,7 +156,19 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
 
         //PM30200
         Call PM30200('$(busunit)','PM30200','DEX_ROW_TS');
-        Call UpdateQvds('PM30200','DOCDATE','DEX_ROW_ID');      
+        Call UpdateQvds('PM30200','DOCDATE','DEX_ROW_ID');   
+
+        //GL10000
+        Call GL10000('$(busunit)','GL10000','DEX_ROW_TS');
+        Call UpdateQvds('GL10000','DOCDATE','DEX_ROW_ID'); 
+
+        //GL20000
+        Call GL20000('$(busunit)','GL20000','DEX_ROW_TS');
+        Call UpdateQvds('GL20000','DOCDATE','DEX_ROW_ID'); 
+
+        //GL30000
+        Call GL30000('$(busunit)','GL30000','DEX_ROW_TS');
+        Call UpdateQvds('GL30000','DOCDATE','DEX_ROW_ID');    
 
     END SUB;
 //-----------------------------------------------------------------------------------------
@@ -395,6 +415,274 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
         END SUB;
     //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+    //************************************GL10000******************************************
+        SUB GL10000(pOwner,pTableName,pDateField)
+
+        LIB CONNECT TO '$(connection)';
+        
+        trace ($(pOwner),$(pTableName),$(pDateField),$(busunit),$(connection));
+        
+
+            [$(pTableName)]:
+            SELECT
+                BACHNUMB,
+                BCHSOURC,
+                JRNENTRY,
+                RCTRXSEQ,
+                SOURCDOC,
+                REFRENCE,
+                TRXDATE,
+                RVRSNGDT,
+                RCRNGTRX,
+                BALFRCLC,
+                PSTGSTUS,
+                LASTUSER,
+                LSTDTEDT,
+                USWHPSTD,
+                TRXTYPE,
+                SQNCLINE,
+                GLHDRMSG,
+                GLHDRMS2,
+                TRXSORCE,
+                RVTRXSRC,
+                SERIES,
+                ORPSTDDT,
+                ORTRXSRC,
+                OrigDTASeries,
+                DTAControlNum,
+                DTATRXType,
+                "DTA_Index",
+                CURNCYID,
+                CURRNIDX,
+                RATETPID,
+                EXGTBLID,
+                XCHGRATE,
+                EXCHDATE,
+                TIME1,
+                RTCLCMTD,
+                NOTEINDX,
+                GLHDRVAL,
+                PERIODID,
+                OPENYEAR,
+                CLOSEDYR,
+                HISTRX,
+                REVPRDID,
+                REVYEAR,
+                REVCLYR,
+                REVHIST,
+                ERRSTATE,
+                ICTRX,
+                ORCOMID,
+                ORIGINJE,
+                ICDISTS,
+                PRNTSTUS,
+                DENXRATE,
+                MCTRXSTT,
+                DOCDATE,
+                "Tax_Date",
+                VOIDED,
+                "Original_JE",
+                "Original_JE_Year",
+                "Original_JE_Seq_Num",
+                "Correcting_Trx_Type",
+                "Ledger_ID",
+                "Adjustment_Transaction",
+                "DEX_ROW_TS",
+                "DEX_ROW_ID"
+            FROM "$(pOwner)"."dbo"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= '$(vMinDate)' 
+                AND "$(pDateField)" < '$(vMaxDate)'
+                ;
+            
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    //************************************GL20000******************************************
+        SUB GL20000(pOwner,pTableName,pDateField)
+
+        LIB CONNECT TO '$(connection)';
+        
+        trace ($(pOwner),$(pTableName),$(pDateField),$(busunit),$(connection));
+        
+
+            [$(pTableName)]:
+            SELECT
+                OPENYEAR,
+                JRNENTRY,
+                RCTRXSEQ,
+                SOURCDOC,
+                REFRENCE,
+                DSCRIPTN,
+                TRXDATE,
+                TRXSORCE,
+                ACTINDX,
+                POLLDTRX,
+                LASTUSER,
+                LSTDTEDT,
+                USWHPSTD,
+                ORGNTSRC,
+                ORGNATYP,
+                QKOFSET,
+                SERIES,
+                ORTRXTYP,
+                ORCTRNUM,
+                ORMSTRID,
+                ORMSTRNM,
+                ORDOCNUM,
+                ORPSTDDT,
+                ORTRXSRC,
+                OrigDTASeries,
+                OrigSeqNum,
+                SEQNUMBR,
+                "DTA_GL_Status",
+                "DTA_Index",
+                CURNCYID,
+                CURRNIDX,
+                RATETPID,
+                EXGTBLID,
+                XCHGRATE,
+                EXCHDATE,
+                TIME1,
+                RTCLCMTD,
+                NOTEINDX,
+                ICTRX,
+                ORCOMID,
+                ORIGINJE,
+                PERIODID,
+                DEBITAMT,
+                CRDTAMNT,
+                ORDBTAMT,
+                ORCRDAMT,
+                DOCDATE,
+                PSTGNMBR,
+                PPSGNMBR,
+                DENXRATE,
+                MCTRXSTT,
+                CorrespondingUnit,
+                VOIDED,
+                "Back_Out_JE",
+                "Back_Out_JE_Year",
+                "Correcting_JE",
+                "Correcting_JE_Year",
+                "Original_JE",
+                "Original_JE_Seq_Num",
+                "Original_JE_Year",
+                "Ledger_ID",
+                "Adjustment_Transaction",
+                APRVLUSERID,
+                APPRVLDT,
+                "DEX_ROW_TS",
+                "DEX_ROW_ID"
+            FROM "$(pOwner)"."dbo"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= '$(vMinDate)' 
+                AND "$(pDateField)" < '$(vMaxDate)'
+                ;
+            
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    //************************************GL30000******************************************
+        SUB GL30000(pOwner,pTableName,pDateField)
+
+        LIB CONNECT TO '$(connection)';
+        
+        trace ($(pOwner),$(pTableName),$(pDateField),$(busunit),$(connection));
+        
+
+            [$(pTableName)]:
+            SELECT
+                HSTYEAR,
+                JRNENTRY,
+                RCTRXSEQ,
+                SOURCDOC,
+                REFRENCE,
+                DSCRIPTN,
+                TRXDATE,
+                ACTINDX,
+                TRXSORCE,
+                POLLDTRX,
+                LASTUSER,
+                LSTDTEDT,
+                USWHPSTD,
+                ORGNTSRC,
+                ORGNATYP,
+                QKOFSET,
+                SERIES,
+                ORTRXTYP,
+                ORCTRNUM,
+                ORMSTRID,
+                ORMSTRNM,
+                ORDOCNUM,
+                ORPSTDDT,
+                ORTRXSRC,
+                OrigDTASeries,
+                OrigSeqNum,
+                SEQNUMBR,
+                "DTA_GL_Status",
+                "DTA_Index",
+                CURNCYID,
+                CURRNIDX,
+                RATETPID,
+                EXGTBLID,
+                XCHGRATE,
+                EXCHDATE,
+                TIME1,
+                RTCLCMTD,
+                NOTEINDX,
+                ICTRX,
+                ORCOMID,
+                ORIGINJE,
+                PERIODID,
+                DEBITAMT,
+                CRDTAMNT,
+                ORDBTAMT,
+                ORCRDAMT,
+                DOCDATE,
+                PSTGNMBR,
+                PPSGNMBR,
+                DENXRATE,
+                MCTRXSTT,
+                CorrespondingUnit,
+                VOIDED,
+                "Back_Out_JE",
+                "Back_Out_JE_Year",
+                "Correcting_JE",
+                "Correcting_JE_Year",
+                "Original_JE",
+                "Original_JE_Seq_Num",
+                "Original_JE_Year",
+                "Ledger_ID",
+                "Adjustment_Transaction",
+                APRVLUSERID,
+                APPRVLDT,
+                "DEX_ROW_TS",
+                "DEX_ROW_ID"
+            FROM "$(pOwner)"."dbo"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= '$(vMinDate)' 
+                AND "$(pDateField)" < '$(vMaxDate)'
+                ;
+            
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 //*****************************************************************************************
 
 
@@ -599,10 +887,122 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
         STORE [PM00200] INTO 'lib://$(Filepath)\$(SourceFolder)\PM00200_$(busunit).qvd';
         DROP TABLE [PM00200];
 
+
+        [GL00100]:
+        SELECT 
+            ACTINDX,
+            "ACTNUMBR_1",
+            "ACTNUMBR_2",
+            "ACTNUMBR_3",
+            "ACTNUMBR_4",
+            "ACTNUMBR_5",
+            "ACTNUMBR_6",
+            "ACTNUMBR_7",
+            "ACTNUMBR_8",
+            ACTALIAS,
+            MNACSGMT,
+            ACCTTYPE,
+            ACTDESCR,
+            PSTNGTYP,
+            ACCATNUM,
+            ACTIVE,
+            TPCLBLNC,
+            DECPLACS,
+            FXDORVAR,
+            BALFRCLC,
+            DSPLKUPS,
+            CNVRMTHD,
+            HSTRCLRT,
+            NOTEINDX,
+            CREATDDT,
+            MODIFDT,
+            USERDEF1,
+            USERDEF2,
+            PostSlsIn,
+            PostIvIn,
+            PostPurchIn,
+            PostPRIn,
+            ADJINFL,
+            INFLAREV,
+            INFLAEQU,
+            ACCTENTR,
+            USRDEFS1,
+            USRDEFS2,
+            "Clear_Balance",
+            "DEX_ROW_TS",
+            "DEX_ROW_ID"
+        FROM $(busunit).dbo.GL00100;
+        STORE [GL00100] INTO 'lib://$(Filepath)\$(SourceFolder)\GL00100_$(busunit).qvd';
+        DROP TABLE [GL00100];
+
+        [GL00105]:
+        SELECT 
+            ACTINDX,
+            "ACTNUMBR_1",
+            "ACTNUMBR_2",
+            "ACTNUMBR_3",
+            "ACTNUMBR_4",
+            "ACTNUMBR_5",
+            "ACTNUMBR_6",
+            "ACTNUMBR_7",
+            "ACTNUMBR_8",
+            ACTNUMST,
+            "DEX_ROW_ID"
+        FROM $(busunit).dbo.GL00105;
+        STORE [GL00105] INTO 'lib://$(Filepath)\$(SourceFolder)\GL00105_$(busunit).qvd';
+        DROP TABLE [GL00105];   
+
+
+        [GL10001]:
+        SELECT 
+            BACHNUMB,
+            JRNENTRY,
+            SQNCLINE,
+            ACTINDX,
+            XCHGRATE,
+            DSCRIPTN,
+            GLLINMSG,
+            GLLINMS2,
+            CURRNIDX,
+            GLLINVAL,
+            ACCTTYPE,
+            FXDORVAR,
+            BALFRCLC,
+            PSTNGTYP,
+            DECPLACS,
+            ORCTRNUM,
+            ORDOCNUM,
+            ORMSTRID,
+            ORMSTRNM,
+            ORTRXTYP,
+            OrigSeqNum,
+            ORTRXDESC,
+            "DTA_GL_Status",
+            INTERID,
+            RATETPID,
+            EXGTBLID,
+            EXCHDATE,
+            TIME1,
+            RTCLCMTD,
+            DEBITAMT,
+            CRDTAMNT,
+            ORDBTAMT,
+            ORCRDAMT,
+            DENXRATE,
+            MCTRXSTT,
+            LNESTAT,
+            CorrespondingUnit,
+            "DEX_ROW_TS",
+            "DEX_ROW_ID"  
+        FROM $(busunit).dbo.GL10001;
+        STORE [GL10001] INTO 'lib://$(Filepath)\$(SourceFolder)\GL10001_$(busunit).qvd';
+        DROP TABLE [GL10001];  
+
     End Sub;
 //-----------------------------------------------------------------------------------------
 
 
 
 Call GP_BU_Extract('GP_OLBT','OLBT');
+Call GP_BU_Extract('GP_CO','CO');
 //add repeats for additional BU extractions
