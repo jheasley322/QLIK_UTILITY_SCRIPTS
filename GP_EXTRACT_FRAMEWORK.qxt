@@ -4,8 +4,8 @@ SET MoneyThousandSep=',';
 SET MoneyDecimalSep='.';
 SET MoneyFormat='$#,##0.00;($#,##0.00)';
 SET TimeFormat='h:mm:ss TT';
-SET DateFormat='YYYY-MM-DD';
-SET TimestampFormat='YYYY-MM-DD h:mm:ss[.fff] TT';
+SET DateFormat='M/D/YYYY';
+SET TimestampFormat='M/D/YYYY h:mm:ss[.fff] TT';
 SET FirstWeekDay=6;
 SET BrokenWeeks=1;
 SET ReferenceDay=0;
@@ -25,7 +25,7 @@ SET LongDayNames='Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
 
 // Setting to reload data in full or just partial
 
-LET vReloadType = 0;  // uncomment this to force a specific reload type 
+LET vReloadType = 1;  // uncomment this to force a specific reload type 
 // || 0 = Partial || 1 = History ||
 // Let vMode = If(Match(Weekday(today()),'Sun'),1,0);
 // Let vReloadType = $(vMode);
@@ -41,7 +41,7 @@ LET vReloadType = 0;  // uncomment this to force a specific reload type
         let SourceFolder = '$(busunit)';
         let HistoryYears= 2;
 
-        Call StaticTables;
+//         Call StaticTables;
 
         IF vReloadType = 1 THEN
             CALL getHistory;
@@ -82,10 +82,10 @@ LET vReloadType = 0;  // uncomment this to force a specific reload type
 
 
 
-        LET vEndDate = Date(MonthEnd(Today()) + 1,'YYYY-MM-DD');
-        LET vMinDate = Date(AddYears(YearStart(vEndDate),-$(HistoryYears)),'YYYY-MM-DD');
+        LET vEndDate = Date(MonthEnd(Today()) + 1,'M/D/YYYY');
+        LET vMinDate = Date(AddYears(YearStart(vEndDate),-$(HistoryYears)),'M/D/YYYY');
 
-        LET vMaxDate 	= Date(MonthEnd(vMinDate) + 1,'YYYY-MM-DD');
+        LET vMaxDate 	= Date(MonthEnd(vMinDate) + 1,'M/D/YYYY');
         LET vYearMonth 	= Year(vMinDate)&Num(Month(vMinDate),'00');
 
         DO WHILE vEndDate >= vMaxDate
@@ -108,13 +108,14 @@ LET vReloadType = 0;  // uncomment this to force a specific reload type
 
             //Call TableName ('pOwner','pTableName','pDateField')
             // example       'reportdb','bnfi_invoice','create_date' 
-
-            Call LOAD_PLANNING_SHIPMENTS ('OWNING_USER_OR_SCHEMA','TABLE_NAME','KEY_DATE')   
-        
+            
+            Call PM20000 ('$(busunit)','PM20000','DOCDATE');   
+        	
             //Setting variables for next step
             LET vMinDate 	= vMaxDate;
-            LET vMaxDate 	= Date(MonthEnd(vMinDate) + 1,'YYYY-MM-DD');
+            LET vMaxDate 	= Date(MonthEnd(vMinDate) + 1,'M/D/YYYY');
             LET vYearMonth 	= Year(vMinDate)&Num(Month(vMinDate),'00'); // For qvd name
+            
         LOOP;
 
     END SUB;
@@ -125,23 +126,23 @@ LET vReloadType = 0;  // uncomment this to force a specific reload type
 //***********************************GET UPDATED*******************************************
 //######################## ADD CALLS FOR EACH TABLE IN THIS SECTION########################
     SUB getUpdated
-
+		trace doing getupdate;
         //******************************************************************************
         // 	Name:			getUpdated
         // 	Description: 	Gets only updated records based on the update date field and 
         //					saves into the appropriate year-month qvd based on create date
         //******************************************************************************
 
-        LET vMinDate = Date(Today()-5,'YYYY-MM-DD'); //Always gets 5 days before, just in case one day it did not run
-        LET vMaxDate = Date(Today()+1,'YYYY-MM-DD');
+        LET vMinDate = Date(Today()-5,'M/D/YYYY'); //Always gets 5 days before, just in case one day it did not run
+        LET vMaxDate = Date(Today()+1,'M/D/YYYY');
 
         /*//TableName
         Call SubName('Owner','Tablename','KeyModifyDate');
         Call UpdateQvds('TableName','KeyDate','PrimaryKey') */
 
         //LOAD_PLANNING_SHIPMENTS
-        Call LOAD_PLANNING_SHIPMENTS('OWNING_USER_OR_SCHEMA','TABLE_NAME','KEY_UPDATE_DATE');
-        Call UpdateQvds('TABLE_NAME','KEY_DATE','PRIMARY_KEY');        
+        Call PM20000('$(busunit)','PM20000','DEX_ROW_TS');
+        Call UpdateQvds('PM20000','DOCDATE','DEX_ROW_ID');        
 
     END SUB;
 //-----------------------------------------------------------------------------------------
@@ -170,8 +171,8 @@ LET vReloadType = 0;  // uncomment this to force a specific reload type
                 "Field_3"
             FROM "$(pOwner)"."$(pTableName)"
             WHERE 
-                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
-                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
+                    "$(pDateField)" >= TO_DATE('$(vMinDate)','M/D/YYYY') 
+                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','M/D/YYYY');
 
 
             IF vReloadType = 1 THEN
@@ -183,31 +184,105 @@ LET vReloadType = 0;  // uncomment this to force a specific reload type
     //---------------------
 
     //***************************LOAD_PLANNING_SHIPMENTS*****************************
-        SUB TABLE_NAME(pOwner,pTableName,pDateField)
+        SUB PM20000(pOwner,pTableName,pDateField)
 
         LIB CONNECT TO '$(connection)';
+        
+        trace ($(pOwner),$(pTableName),$(pDateField),$(busunit),$(connection));
+        
 
             [$(pTableName)]:
             SELECT
-                '$(busunit)' 
-                "PRIMARY_KEY",
-                "KEY_DATE",
-                "KEY_UPDATE_DATE",
-                "FIELD_1",
-                "FIELD_2",
-                "FIELD_3",
-                "FIELD_4"
-            FROM "$(pOwner)"."$(pTableName)"
+                VCHRNMBR,
+                VENDORID,
+                DOCTYPE,
+                DOCDATE,
+                DOCNUMBR,
+                DOCAMNT,
+                CURTRXAM,
+                DISTKNAM,
+                DISCAMNT,
+                DSCDLRAM,
+                BACHNUMB,
+                TRXSORCE,
+                BCHSOURC,
+                DISCDATE,
+                DUEDATE,
+                PORDNMBR,
+                TEN99AMNT,
+                WROFAMNT,
+                DISAMTAV,
+                TRXDSCRN,
+                UN1099AM,
+                BKTPURAM,
+                BKTFRTAM,
+                BKTMSCAM,
+                VOIDED,
+                HOLD,
+                CHEKBKID,
+                DINVPDOF,
+                PPSAMDED,
+                PPSTAXRT,
+                PGRAMSBJ,
+                GSTDSAMT,
+                POSTEDDT,
+                PTDUSRID,
+                MODIFDT,
+                MDFUSRID,
+                PYENTTYP,
+                CARDNAME,
+                PRCHAMNT,
+                TRDISAMT,
+                MSCCHAMT,
+                FRTAMNT,
+                TAXAMNT,
+                TTLPYMTS,
+                CURNCYID,
+                PYMTRMID,
+                SHIPMTHD,
+                TAXSCHID,
+                PCHSCHID,
+                FRTSCHID,
+                MSCSCHID,
+                PSTGDATE,
+                DISAVTKN,
+                CNTRLTYP,
+                NOTEINDX,
+                PRCTDISC,
+                RETNAGAM,
+                ICTRX,
+                "Tax_Date",
+                PRCHDATE,
+                CORRCTN,
+                SIMPLIFD,
+                BNKRCAMT,
+                APLYWITH,
+                Electronic,
+                ECTRX,
+                DocPrinted,
+                TaxInvReqd,
+                VNDCHKNM,
+                BackoutTradeDisc,
+                CBVAT,
+                VADCDTRO,
+                TEN99TYPE,
+                TEN99BOXNUMBER,
+                PONUMBER,
+                "Workflow_Status",
+                "DEX_ROW_TS",
+                "DEX_ROW_ID"
+            FROM "$(pOwner)"."dbo"."$(pTableName)"
             WHERE 
-                    "$(pDateField)" >= TO_DATE('$(vMinDate)','YYYY-MM-DD') 
-                AND "$(pDateField)" < TO_DATE('$(vMaxDate)','YYYY-MM-DD');
-
-
+                    "$(pDateField)" >= '$(vMinDate)' 
+                AND "$(pDateField)" < '$(vMaxDate)'
+                ;
+			trace made it to 1;
+            
             IF vReloadType = 1 THEN
                 STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth).qvd';
                 DROP TABLE [$(pTableName)];
             ENDIF
-
+			trace made it to 2;
         END SUB;
     //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -296,127 +371,127 @@ LET vReloadType = 0;  // uncomment this to force a specific reload type
 
 //-----------------------------------------------------------------------------------------
 //***********************************STATIC TABLE EXTRACT**********************************
-Sub StaticTables
+    Sub StaticTables
     
-    LIB CONNECT TO '$(connection)';
-    //vendor table
-    [PM00200]:
-    SELECT
-        '$(businessunitcode)' as "OLT_BU",
-        VENDORID,
-        VENDNAME,
-        VNDCHKNM,
-        VENDSHNM,
-        VADDCDPR,
-        VADCDPAD,
-        VADCDSFR,
-        VADCDTRO,
-        VNDCLSID,
-        VNDCNTCT,
-        ADDRESS1,
-        ADDRESS2,
-        ADDRESS3,
-        CITY,
-        STATE,
-        ZIPCODE,
-        COUNTRY,
-        PHNUMBR1,
-        PHNUMBR2,
-        PHONE3,
-        FAXNUMBR,
-        UPSZONE,
-        SHIPMTHD,
-        TAXSCHID,
-        ACNMVNDR,
-        TXIDNMBR,
-        VENDSTTS,
-        CURNCYID,
-        TXRGNNUM,
-        PARVENID,
-        TRDDISCT,
-        TEN99TYPE,
-        TEN99BOXNUMBER,
-        MINORDER,
-        PYMTRMID,
-        MINPYTYP,
-        MINPYPCT,
-        MINPYDLR,
-        MXIAFVND,
-        MAXINDLR,
-        COMMENT1,
-        COMMENT2,
-        USERDEF1,
-        USERDEF2,
-        CRLMTDLR,
-        PYMNTPRI,
-        KPCALHST,
-        KGLDSTHS,
-        KPERHIST,
-        KPTRXHST,
-        HOLD,
-        PTCSHACF,
-        CREDTLMT,
-        WRITEOFF,
-        MXWOFAMT,
-        SBPPSDED,
-        PPSTAXRT,
-        DXVARNUM,
-        CRTCOMDT,
-        CRTEXPDT,
-        RTOBUTKN,
-        XPDTOBLG,
-        PRSPAYEE,
-        PMAPINDX,
-        PMCSHIDX,
-        PMDAVIDX,
-        PMDTKIDX,
-        PMFINIDX,
-        PMMSCHIX,
-        PMFRTIDX,
-        PMTAXIDX,
-        PMWRTIDX,
-        PMPRCHIX,
-        PMRTNGIX,
-        PMTDSCIX,
-        ACPURIDX,
-        PURPVIDX,
-        NOTEINDX,
-        CHEKBKID,
-        MODIFDT,
-        CREATDDT,
-        RATETPID,
-        "Revalue_Vendor",
-        "Post_Results_To",
-        FREEONBOARD,
-        GOVCRPID,
-        GOVINDID,
-        DISGRPER,
-        DUEGRPER,
-        DOCFMTID,
-        TaxInvRecvd,
-        USERLANG,
-        WithholdingType,
-        WithholdingFormType,
-        WithholdingEntityType,
-        TaxFileNumMode,
-        BRTHDATE,
-        LaborPmtType,
-        CCode,
-        DECLID,
-        CBVAT,
-        "Workflow_Approval_Status",
-        "Workflow_Priority",
-        "Workflow_Status",
-        VADCD1099,
-        "DEX_ROW_TS",
-        "DEX_ROW_ID"
-    FROM '$(businessunitcode)'.dbo.PM00200;
-    STORE [PM00200] INTO 'lib://$(Filepath)\$(SourceFolder)\PM00200_$(businessunit).qvd';
-    DROP TABLE [PM00200];
+        LIB CONNECT TO '$(connection)';
+        //vendor table
+        [PM00200]:
+        SELECT
+            VENDORID,
+            VENDNAME,
+            VNDCHKNM,
+            VENDSHNM,
+            VADDCDPR,
+            VADCDPAD,
+            VADCDSFR,
+            VADCDTRO,
+            VNDCLSID,
+            VNDCNTCT,
+            ADDRESS1,
+            ADDRESS2,
+            ADDRESS3,
+            CITY,
+            STATE,
+            ZIPCODE,
+            COUNTRY,
+            PHNUMBR1,
+            PHNUMBR2,
+            PHONE3,
+            FAXNUMBR,
+            UPSZONE,
+            SHIPMTHD,
+            TAXSCHID,
+            ACNMVNDR,
+            TXIDNMBR,
+            VENDSTTS,
+            CURNCYID,
+            TXRGNNUM,
+            PARVENID,
+            TRDDISCT,
+            TEN99TYPE,
+            TEN99BOXNUMBER,
+            MINORDER,
+            PYMTRMID,
+            MINPYTYP,
+            MINPYPCT,
+            MINPYDLR,
+            MXIAFVND,
+            MAXINDLR,
+            COMMENT1,
+            COMMENT2,
+            USERDEF1,
+            USERDEF2,
+            CRLMTDLR,
+            PYMNTPRI,
+            KPCALHST,
+            KGLDSTHS,
+            KPERHIST,
+            KPTRXHST,
+            HOLD,
+            PTCSHACF,
+            CREDTLMT,
+            WRITEOFF,
+            MXWOFAMT,
+            SBPPSDED,
+            PPSTAXRT,
+            DXVARNUM,
+            CRTCOMDT,
+            CRTEXPDT,
+            RTOBUTKN,
+            XPDTOBLG,
+            PRSPAYEE,
+            PMAPINDX,
+            PMCSHIDX,
+            PMDAVIDX,
+            PMDTKIDX,
+            PMFINIDX,
+            PMMSCHIX,
+            PMFRTIDX,
+            PMTAXIDX,
+            PMWRTIDX,
+            PMPRCHIX,
+            PMRTNGIX,
+            PMTDSCIX,
+            ACPURIDX,
+            PURPVIDX,
+            NOTEINDX,
+            CHEKBKID,
+            MODIFDT,
+            CREATDDT,
+            RATETPID,
+            "Revalue_Vendor",
+            "Post_Results_To",
+            FREEONBOARD,
+            GOVCRPID,
+            GOVINDID,
+            DISGRPER,
+            DUEGRPER,
+            DOCFMTID,
+            TaxInvRecvd,
+            USERLANG,
+            WithholdingType,
+            WithholdingFormType,
+            WithholdingEntityType,
+            TaxFileNumMode,
+            BRTHDATE,
+            LaborPmtType,
+            CCode,
+            DECLID,
+            CBVAT,
+            "Workflow_Approval_Status",
+            "Workflow_Priority",
+            "Workflow_Status",
+            VADCD1099,
+            "DEX_ROW_TS",
+            "DEX_ROW_ID"
+        FROM $(busunit).dbo.PM00200;
+        STORE [PM00200] INTO 'lib://$(Filepath)\$(SourceFolder)\PM00200_$(busunit).qvd';
+        DROP TABLE [PM00200];
 
+    End Sub;
 //-----------------------------------------------------------------------------------------
 
 
 
-Call GP_BU_Extract('connection','busunit');
+Call GP_BU_Extract('GP_OLBT','OLBT');
 //add repeats for additional BU extractions
