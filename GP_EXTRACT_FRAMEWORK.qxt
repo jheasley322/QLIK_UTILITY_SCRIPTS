@@ -41,7 +41,7 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
         let SourceFolder = '$(busunit)';
         let HistoryYears= 2;
 
-//         Call StaticTables;
+        Call StaticTables;
 
         IF vReloadType = 1 THEN
             CALL getHistory;
@@ -56,7 +56,8 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
         // Need one for EACH table that is being extracted in the app
         //*****************************************************************
             // CALL CreateQvd('TableName')
-            CALL CreateQvd('TABLE_NAME');
+            CALL CreateQvd('PM20000');
+            CALL CreateQvd('PM30200');
             //repeats go here//
         //*****************************************************************
     End Sub;
@@ -109,7 +110,8 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
             //Call TableName ('pOwner','pTableName','pDateField')
             // example       'reportdb','bnfi_invoice','create_date' 
             
-            Call PM20000 ('$(busunit)','PM20000','DOCDATE');   
+            Call PM20000 ('$(busunit)','PM20000','DOCDATE');  
+            Call PM20000 ('$(busunit)','PM30200','DOCDATE');   
         	
             //Setting variables for next step
             LET vMinDate 	= vMaxDate;
@@ -140,9 +142,13 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
         Call SubName('Owner','Tablename','KeyModifyDate');
         Call UpdateQvds('TableName','KeyDate','PrimaryKey') */
 
-        //LOAD_PLANNING_SHIPMENTS
+        //PM20000
         Call PM20000('$(busunit)','PM20000','DEX_ROW_TS');
-        Call UpdateQvds('PM20000','DOCDATE','DEX_ROW_ID');        
+        Call UpdateQvds('PM20000','DOCDATE','DEX_ROW_ID');    
+
+        //PM30200
+        Call PM30200('$(busunit)','PM30200','DEX_ROW_TS');
+        Call UpdateQvds('PM30200','DOCDATE','DEX_ROW_ID');      
 
     END SUB;
 //-----------------------------------------------------------------------------------------
@@ -183,7 +189,9 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
         END SUB; */
     //---------------------
 
-    //***************************LOAD_PLANNING_SHIPMENTS*****************************
+//***************************************GP TABLE DETAILS**********************************
+
+    //************************************PM20000******************************************
         SUB PM20000(pOwner,pTableName,pDateField)
 
         LIB CONNECT TO '$(connection)';
@@ -255,7 +263,6 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
                 PRCHDATE,
                 CORRCTN,
                 SIMPLIFD,
-                BNKRCAMT,
                 APLYWITH,
                 Electronic,
                 ECTRX,
@@ -276,17 +283,121 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
                     "$(pDateField)" >= '$(vMinDate)' 
                 AND "$(pDateField)" < '$(vMaxDate)'
                 ;
-			trace made it to 1;
             
             IF vReloadType = 1 THEN
                 STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth).qvd';
                 DROP TABLE [$(pTableName)];
             ENDIF
-			trace made it to 2;
+
+        END SUB;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+    //************************************PM30200******************************************
+        SUB PM30200(pOwner,pTableName,pDateField)
+
+        LIB CONNECT TO '$(connection)';
+        
+        trace ($(pOwner),$(pTableName),$(pDateField),$(busunit),$(connection));
+        
+
+            [$(pTableName)]:
+            SELECT
+                VCHRNMBR,
+                VENDORID,
+                DOCTYPE,
+                DOCDATE,
+                DOCNUMBR,
+                DOCAMNT,
+                CURTRXAM,
+                DISTKNAM,
+                DISCAMNT,
+                DSCDLRAM,
+                BACHNUMB,
+                TRXSORCE,
+                BCHSOURC,
+                DISCDATE,
+                DUEDATE,
+                PORDNMBR,
+                TEN99AMNT,
+                WROFAMNT,
+                DISAMTAV,
+                TRXDSCRN,
+                UN1099AM,
+                BKTPURAM,
+                BKTFRTAM,
+                BKTMSCAM,
+                VOIDED,
+                HOLD,
+                CHEKBKID,
+                DINVPDOF,
+                PPSAMDED,
+                PPSTAXRT,
+                PGRAMSBJ,
+                GSTDSAMT,
+                POSTEDDT,
+                PTDUSRID,
+                MODIFDT,
+                MDFUSRID,
+                PYENTTYP,
+                CARDNAME,
+                PRCHAMNT,
+                TRDISAMT,
+                MSCCHAMT,
+                FRTAMNT,
+                TAXAMNT,
+                TTLPYMTS,
+                CURNCYID,
+                PYMTRMID,
+                SHIPMTHD,
+                TAXSCHID,
+                PCHSCHID,
+                FRTSCHID,
+                MSCSCHID,
+                PSTGDATE,
+                DISAVTKN,
+                CNTRLTYP,
+                NOTEINDX,
+                PRCTDISC,
+                RETNAGAM,
+                VOIDPDATE,
+                ICTRX,
+                "Tax_Date",
+                PRCHDATE,
+                CORRCTN,
+                SIMPLIFD,
+                APLYWITH,
+                Electronic,
+                ECTRX,
+                DocPrinted,
+                TaxInvReqd,
+                VNDCHKNM,
+                BackoutTradeDisc,
+                CBVAT,
+                VADCDTRO,
+                TEN99TYPE,
+                TEN99BOXNUMBER,
+                PONUMBER,
+                "Workflow_Status",
+                "DEX_ROW_TS",
+                "DEX_ROW_ID"
+            FROM "$(pOwner)"."dbo"."$(pTableName)"
+            WHERE 
+                    "$(pDateField)" >= '$(vMinDate)' 
+                AND "$(pDateField)" < '$(vMaxDate)'
+                ;
+            
+            IF vReloadType = 1 THEN
+                STORE [$(pTableName)] INTO 'lib://$(Filepath)\$(SourceFolder)\Incremental\$(pTableName)_$(busunit)_$(vYearMonth).qvd';
+                DROP TABLE [$(pTableName)];
+            ENDIF
+
         END SUB;
     //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 //*****************************************************************************************
+
+
 //-----------------------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------------------
