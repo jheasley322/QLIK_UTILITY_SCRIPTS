@@ -25,7 +25,7 @@ Sub Payments
     LOAD
         '$(busunit)'                            as "Odyssey BU",
         VCHRNMBR                                as "Voucher Number",
-        VENDORID                                as __vendor_id,
+        '$(busunit)-'&VENDORID                  as __vendor_id,
         DOCDATE                                 as "Document Date",
         DOCNUMBR                                as "Document Number",
         DOCAMNT                                 as "Functional Amount",
@@ -51,7 +51,7 @@ Sub Payments
     LOAD
         '$(busunit)'                            as "Odyssey BU",
         VCHRNMBR                                as "Voucher Number",
-        VENDORID                                as __vendor_id,
+        '$(busunit)-'&VENDORID                  as __vendor_id,
         DOCDATE                                 as "Document Date",
         DOCNUMBR                                as "Document Number",
         DOCAMNT                                 as "Functional Amount",
@@ -79,12 +79,148 @@ Sub Payments
 
 End Sub;
 
+Sub GLEntries
+
+    GLEntries_TMP:
+    LOAD
+        '$(busunit)' as "Odyssey BU",
+        BACHNUMB,
+        JRNENTRY,
+        SOURCDOC,
+        REFRENCE,
+        TRXDATE,
+        LASTUSER,
+        USWHPSTD,
+        SERIES,
+        ORTRXSRC,
+        CURNCYID,
+        'Work' as TRX_STATUS
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL10000_$(busunit).qvd](qvd)
+    Where VOIDED = 0;
+
+    Inner Join 
+    LOAD
+        JRNENTRY,
+        ACTINDX,
+        DSCRIPTN,
+        ORDOCNUM,
+        ORMSTRID,
+        ORMSTRNM,
+        DEBITAMT,
+        CRDTAMNT
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL10001_$(busunit).qvd](qvd);
+
+    Concatenate
+    Load
+        '$(busunit)' as "Odyssey BU",
+        ACTINDX, 
+        TRXDATE, 
+        SOURCDOC, 
+        JRNENTRY, 
+        ORTRXSRC, 
+        REFRENCE,
+        ORDOCNUM, 
+        ORMSTRID, 
+        ORMSTRNM, 
+        DEBITAMT, 
+        CRDTAMNT, 
+        CURNCYID,
+        'Open' as TRX_STATUS, 
+        LASTUSER, 
+        USWHPSTD, 
+        ORGNTSRC, 
+        SERIES,
+        DSCRIPTN         
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL20000_$(busunit).qvd](qvd)
+    Where VOIDED = 0
+    AND Not Match(SOURCDOC,'BBF','P/L');
+
+    Concatenate
+    Load
+        '$(busunit)' as "Odyssey BU",
+        ACTINDX, 
+        TRXDATE, 
+        SOURCDOC, 
+        JRNENTRY, 
+        ORTRXSRC, 
+        REFRENCE,
+        ORDOCNUM, 
+        ORMSTRID, 
+        ORMSTRNM, 
+        DEBITAMT, 
+        CRDTAMNT, 
+        CURNCYID,
+        'History' as TRX_STATUS, 
+        LASTUSER, 
+        USWHPSTD, 
+        ORGNTSRC, 
+        SERIES,
+        DSCRIPTN         
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL30000_$(busunit).qvd](qvd)
+    Where VOIDED = 0
+    AND Not Match(SOURCDOC,'BBF','P/L');
+
+
+    GLEntries:
+    Load
+        "Odyssey BU"&'-'&ACTINDX as ACTINDX,
+        "Odyssey BU", 
+        TRXDATE as "Transaction Date", 
+        SOURCDOC as "Source Document", 
+        JRNENTRY as "Journal Entry", 
+        ORTRXSRC as "Originating Transactional Source", 
+        REFRENCE as "Reference",
+        ORDOCNUM as "Originating Document Number", 
+        ORMSTRID as "Originating Master ID", 
+        ORMSTRNM as "Originating Master Name", 
+        DEBITAMT as "Debit Amount", 
+        CRDTAMNT as "Credit Amount", 
+        CURNCYID as "Currency ID",
+        TRX_STATUS as "Transaction Status", 
+        LASTUSER as "Last User", 
+        USWHPSTD as "Posting User", 
+        ORGNTSRC as "Batch Number", 
+        If(Match(SERIES,1),'All',
+            If(Match(SERIES,2),'Financial',
+            If(Match(SERIES,3),'Sales',
+            If(Match(SERIES,4),'Purchasing',
+            If(Match(SERIES,5),'Inventory',
+            If(Match(SERIES,6),'Payroll - USA',
+            If(Match(SERIES,7),'Project',
+            If(Match(SERIES,10),'3rd Party',
+            'Other')))))))) as Series
+
+        DSCRIPTN as "Description"  
+    Resident GLEntries_TMP;
+
+    Store GLEntries into [lib://Qlik Network Folders/GP/2_Transform_QVD/GLEntries_$(busunit).qvd](qvd);
+    Drop Table GLEntries, GLEntries_TMP;
+
+    GLAcctNums:
+    LOAD
+        '$(busunit)-'&ACTINDX as ACTINDX,
+        ACTNUMST as "Account Number"
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL00105_$(busunit).qvd](qvd);
+    Store GLAcctNums into [lib://Qlik Network Folders/GP/2_Transform_QVD/GLAcctNums_$(busunit).qvd](qvd);
+    Drop Table GLAcctNums;
+
+    GLAcctDesc:
+    Load
+        '$(busunit)-'&ACTINDX as ACTINDX,
+        ACTDESCR as "Account Description"
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL00100_$(busunit).qvd](qvd);
+    Store GLAcctDesc into [lib://Qlik Network Folders/GP/2_Transform_QVD/GLAcctDesc_$(busunit).qvd](qvd);
+    Drop Table GLAcctDesc;
+
+End Sub;
+
+
 Sub Vendors
     
     vendors_tmp:
     LOAD
         '$(busunit)'    as "Odyssey BU (vendors)",
-        VENDORID        as __vendor_id,
+        '$(busunit)-'&VENDORID        as __vendor_id,
         VENDNAME        as "Vendor Name",
         VNDCHKNM        as "Vendor Check Name",
         VENDSHNM        as "Vendor Short Name"
@@ -99,6 +235,7 @@ End Sub;
 Sub MasterFiles(busunit)
     Call Payments;
     Call Vendors;
+    Call GLEntries;
 End Sub;
 
 Call MasterFiles('CO');
