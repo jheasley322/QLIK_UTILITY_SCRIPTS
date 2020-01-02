@@ -95,7 +95,7 @@ Sub GLEntries
         ORTRXSRC,
         CURNCYID,
         'Work' as TRX_STATUS
-    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL10000_$(busunit).qvd](qvd)
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/$(busunit)/GL10000_$(busunit).qvd](qvd)
     Where VOIDED = 0;
 
     Inner Join 
@@ -108,7 +108,7 @@ Sub GLEntries
         ORMSTRNM,
         DEBITAMT,
         CRDTAMNT
-    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL10001_$(busunit).qvd](qvd);
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/$(busunit)/GL10001_$(busunit).qvd](qvd);
 
     Concatenate
     Load
@@ -131,7 +131,7 @@ Sub GLEntries
         ORGNTSRC, 
         SERIES,
         DSCRIPTN         
-    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL20000_$(busunit).qvd](qvd)
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/$(busunit)/GL20000_$(busunit).qvd](qvd)
     Where VOIDED = 0
     AND Not Match(SOURCDOC,'BBF','P/L');
 
@@ -156,7 +156,7 @@ Sub GLEntries
         ORGNTSRC, 
         SERIES,
         DSCRIPTN         
-    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL30000_$(busunit).qvd](qvd)
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/$(busunit)/GL30000_$(busunit).qvd](qvd)
     Where VOIDED = 0
     AND Not Match(SOURCDOC,'BBF','P/L');
 
@@ -188,8 +188,7 @@ Sub GLEntries
             If(Match(SERIES,6),'Payroll - USA',
             If(Match(SERIES,7),'Project',
             If(Match(SERIES,10),'3rd Party',
-            'Other')))))))) as Series
-
+            'Other')))))))) as Series,
         DSCRIPTN as "Description"  
     Resident GLEntries_TMP;
 
@@ -200,7 +199,7 @@ Sub GLEntries
     LOAD
         '$(busunit)-'&ACTINDX as ACTINDX,
         ACTNUMST as "Account Number"
-    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL00105_$(busunit).qvd](qvd);
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/$(busunit)/GL00105_$(busunit).qvd](qvd);
     Store GLAcctNums into [lib://Qlik Network Folders/GP/2_Transform_QVD/GLAcctNums_$(busunit).qvd](qvd);
     Drop Table GLAcctNums;
 
@@ -208,7 +207,7 @@ Sub GLEntries
     Load
         '$(busunit)-'&ACTINDX as ACTINDX,
         ACTDESCR as "Account Description"
-    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/OLBT/GL00100_$(busunit).qvd](qvd);
+    FROM [lib://Qlik Network Folders/GP/1_Source_QVD/$(busunit)/GL00100_$(busunit).qvd](qvd);
     Store GLAcctDesc into [lib://Qlik Network Folders/GP/2_Transform_QVD/GLAcctDesc_$(busunit).qvd](qvd);
     Drop Table GLAcctDesc;
 
@@ -238,5 +237,6 @@ Sub MasterFiles(busunit)
     Call GLEntries;
 End Sub;
 
-Call MasterFiles('CO');
+
 Call MasterFiles('OLBT');
+Call MasterFiles('CO');
