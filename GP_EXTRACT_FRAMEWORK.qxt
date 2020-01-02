@@ -30,6 +30,23 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
 // Let vMode = If(Match(Weekday(today()),'Sun'),1,0);
 // Let vReloadType = $(vMode);
 
+//====================================TABLE LISTING========================================
+// these are the current tables being exctracted in this app:
+/* iterative extracts:
+        PM20000
+        PM30200
+        GL10000
+        GL20000
+        GL30000
+*/
+/* static extracts:
+        PM00200
+        GL00100
+        GL00105
+        GL10001
+*/
+//=========================================================================================
+
 
 //-----------------------------------------------------------------------------------------
 //*************************************CALL STATEMENTS*************************************
