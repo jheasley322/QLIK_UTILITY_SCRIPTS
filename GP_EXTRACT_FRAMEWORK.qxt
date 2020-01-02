@@ -117,9 +117,9 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
             Call PM20000 ('$(busunit)','PM20000','DOCDATE');  
             Call PM30200 ('$(busunit)','PM30200','DOCDATE'); 
 
-            Call GL10000 ('$(busunit)','GL10000','DOCDATE');
-            Call GL20000 ('$(busunit)','GL20000','DOCDATE');
-            Call GL30000 ('$(busunit)','GL30000','DOCDATE');  
+            Call GL10000 ('$(busunit)','GL10000','TRXDATE');
+            Call GL20000 ('$(busunit)','GL20000','TRXDATE');
+            Call GL30000 ('$(busunit)','GL30000','TRXDATE');  
         	
             //Setting variables for next step
             LET vMinDate 	= vMaxDate;
@@ -160,15 +160,15 @@ LET vReloadType = 1;  // uncomment this to force a specific reload type
 
         //GL10000
         Call GL10000('$(busunit)','GL10000','DEX_ROW_TS');
-        Call UpdateQvds('GL10000','DOCDATE','DEX_ROW_ID'); 
+        Call UpdateQvds('GL10000','TRXDATE','DEX_ROW_ID'); 
 
         //GL20000
         Call GL20000('$(busunit)','GL20000','DEX_ROW_TS');
-        Call UpdateQvds('GL20000','DOCDATE','DEX_ROW_ID'); 
+        Call UpdateQvds('GL20000','TRXDATE','DEX_ROW_ID'); 
 
         //GL30000
         Call GL30000('$(busunit)','GL30000','DEX_ROW_TS');
-        Call UpdateQvds('GL30000','DOCDATE','DEX_ROW_ID');    
+        Call UpdateQvds('GL30000','TRXDATE','DEX_ROW_ID');    
 
     END SUB;
 //-----------------------------------------------------------------------------------------
