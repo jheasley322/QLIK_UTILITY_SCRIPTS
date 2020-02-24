@@ -258,13 +258,13 @@ ELSE                                                                            
             LET CardMessage = 'There are ' & $(vFailCount) 
                 &' tasks currently in a failed status ('& NOW()&')'&
                 '<br>'&' List of Failed Tasks: <br>'& '$(vAllFails)';                               // card message
-            LET CardColor = '$(iColor)';                                                            // card color
-            LET CardSubTitle          = 'Task Failure Alert';                                       // sub title
+            LET CardColor       = '$(iColor)';                                                      // card color
+            LET CardSubTitle    = 'Task Failure Alert';                                             // subtitle
         //-------------------------------------------------------------------------this block is not currently in use----------------------------------                                                    
         ELSE                                                                                        // if there are less than 1 failures, set the main card details as this
             LET CardMessage = 'There are currently no task failures';                               // card message
             LET CardColor = '$(iColor)';                                                            // card color
-            LET CardSubTitle = 'No Failures';                                                       // sub title
+            LET CardSubTitle = 'No Failures';                                                       // subtitle
         //----------------------------------------------------------------------------------------------------------------------------------------------    
         END IF;
         
