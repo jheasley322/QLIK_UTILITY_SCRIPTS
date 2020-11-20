@@ -23,7 +23,7 @@ foreach ($i in $nodes) {
     } 
 }
 
-$updated_sessions = $sessions | ? {$_.directory -notlike "*INTERNAL"}
+$updated_sessions = $sessions | Where-Object {$_.directory -notlike "*INTERNAL"}
 $updated_sessions.count
 
 if ( $updated_sessions.count -ne 0 )
