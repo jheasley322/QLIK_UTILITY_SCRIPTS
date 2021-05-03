@@ -1,10 +1,29 @@
-Get-PfxCertificate "C:\Users\JoeEasley\OneDrive - Odyssey Logistics & Technology Corporation\Desktop\NC-JEASLY1\client.pfx" | Connect-Qlik -computername t1prd-qlik01.odysseylogistics.COM -username odysseylogistic\QlikServiceProd -TrustAllCerts -verbose
-$myserver = "t1prd-qlik01.odysseylogistics.COM"
-$folder = "C:\Users\JoeEasley\OneDrive - Odyssey Logistics & Technology Corporation\Desktop\Archive_Unused_5_3_21"
+$certloc = "C:\Users\JoeEasley\OneDrive - Odyssey Logistics & Technology Corporation\Desktop\NC-JEASLY1\client.pfx"
+$myserver = "t1prd-qlik01.odysseylogistics.com"
+$archive = "Archive_Unused_5_3_21"
 $streamname = "UTIL - Out of Service"
+$folder = "C:\Users\JoeEasley\OneDrive - Odyssey Logistics & Technology Corporation\Desktop\$archive"
+$domainname = "ODYSSEYLOGISTIC"
+$serviceacct = "QlikServiceProd"
 
+Get-PfxCertificate "$certloc" | Connect-Qlik -computername "$myserver" -username "$domainname\$serviceacct" -TrustAllCerts -verbose
 Connect-Qlik $myserver ## check https://github.com/ahaydon/Qlik-Cli for details
 
+
+##show list of apps to be exported
+[System.Collections.ArrayList]$apps = @()
+foreach($qvf in $(Get-QlikApp -filter "stream.name eq '$streamname'" -full))
+{
+    $s = [PSCustomObject]@{
+        Name                = $qvf.name 
+        Fileize_kb          = $qvf.Filesize/1000
+        Reloaded            = $qvf.lastReloadTime
+    }
+    $apps.Add($s)
+}
+$apps | Format-Table
+
+##export each app to the specified directory
 foreach($qvf in $(Get-QlikApp -filter "stream.name eq '$streamname'")) {
     if ($qvf.published -and $qvf.stream.name) { # Is it published?
         $streamfolder = $qvf.stream.name
@@ -15,5 +34,5 @@ foreach($qvf in $(Get-QlikApp -filter "stream.name eq '$streamname'")) {
     } else {
         $streamfolder = ""
     }
-    Export-QlikApp -id $qvf.id -filename "$($folder)\$($streamfolder)\$($qvf.name).qvf" #dumps the qvf
+    Export-QlikApp -id $qvf.id -filename "$($folder)\$($streamfolder)\$($qvf.name).qvf" 
 }
